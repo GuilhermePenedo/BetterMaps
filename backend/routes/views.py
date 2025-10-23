@@ -1,3 +1,20 @@
-from django.shortcuts import render
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from .services.osrm_service import get_nearest_service
 
-# Create your views here.
+class OsrmNearestView(APIView):
+    def get(self, request):
+        lng = request.query_params.get('lng')
+        lat = request.query_params.get('lat')
+        profile = request.query_params.get('profile', 'driving')
+
+        if not lng or not lat:
+            return Response({'error': 'lng and lat required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        coords = f"{lng},{lat}"
+        try:
+            result = get_nearest_service(profile, coords, 1)
+            return Response(result)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

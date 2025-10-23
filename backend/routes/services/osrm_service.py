@@ -1,15 +1,12 @@
 import httpx
 
 server = "router.project-osrm.org"
-
 my_coords = "9.139806,38.736889"
 
 def get_request(service, version,profile, coordinates, format, options):
     url = f"http://{server}/{service}/{version}/{profile}/{coordinates}.{format}"
-
     if options:
         url += "?" + "&".join(options)
-
     response = httpx.get(url)
     response.raise_for_status()  # opcional: lança erro se HTTP != 200
     return response.json()
