@@ -39,6 +39,10 @@ Thumbs.db
 .vscode/
 .idea
 
-
+# Ambiente virtual do Python
 .venv/
 activate_venv.sh
+
+# Ficheiros cache do Python
+__pycache__/
+*.pyc

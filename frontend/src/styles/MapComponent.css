@@ -1,0 +1,151 @@
+.map-container-wrapper {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+}
+
+.side-panel {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 320px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    max-height: calc(100vh - 20px);
+    overflow-y: auto;
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.panel-content {
+    padding: 20px;
+}
+
+.panel-content h3 {
+    margin: 0 0 15px 0;
+    font-size: 18px;
+    color: #333;
+    border-bottom: 2px solid #007bff;
+    padding-bottom: 10px;
+}
+
+.panel-content p {
+    margin: 8px 0;
+    color: #666;
+    font-size: 14px;
+}
+
+.destination-info,
+.info-section {
+    background: #f8f9fa;
+    border-left: 4px solid #007bff;
+    padding: 12px;
+    border-radius: 4px;
+    margin: 12px 0;
+}
+
+.destination-info p,
+.info-section p {
+    margin: 4px 0;
+}
+
+.instructions {
+    font-style: italic;
+    color: #999;
+    margin: 15px 0;
+    text-align: center;
+}
+
+.or-divider {
+    text-align: center;
+    margin: 15px 0;
+    color: #999;
+    font-weight: bold;
+}
+
+.btn {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-bottom: 8px;
+}
+
+.btn-primary {
+    background-color: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #0056b3;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 86, 179, 0.3);
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background-color: #545b62;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(84, 91, 98, 0.3);
+}
+
+.btn:active {
+    transform: translateY(0);
+}
+
+/* Scrollbar personalizado */
+.side-panel::-webkit-scrollbar {
+    width: 6px;
+}
+
+.side-panel::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+.side-panel::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 10px;
+}
+
+.side-panel::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Responsivo para dispositivos menores */
+@media (max-width: 768px) {
+    .side-panel {
+        width: calc(100% - 20px);
+        right: 10px;
+        left: 10px;
+        max-width: 400px;
+    }
+
+    .panel-content {
+        padding: 15px;
+    }
+
+    .panel-content h3 {
+        font-size: 16px;
+    }
+}
