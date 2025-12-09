@@ -369,3 +369,60 @@
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     border: 1px solid #e5e7eb; /* Opcional: contorno subtil */
 }
+
+
+/* =========================================
+   10. Seletor de Tipo de Rota
+   ========================================= */
+.route-type-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* 2 colunas */
+    gap: 8px;
+    margin-bottom: 15px;
+}
+
+.type-btn {
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #4b5563;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.type-btn:hover {
+    background-color: #f9fafb;
+    border-color: #d1d5db;
+}
+
+/* Cores específicas para cada tipo quando ativo */
+.type-btn.active.normal {
+    background-color: #f3f4f6;
+    border-color: #6b7280;
+    color: #1f2937;
+}
+
+.type-btn.active.tourist {
+    background-color: #fff7ed; /* Laranja claro */
+    border-color: #f97316;
+    color: #c2410c;
+}
+
+.type-btn.active.climatic {
+    background-color: #ecfdf5; /* Verde claro */
+    border-color: #10b981;
+    color: #047857;
+}
+
+.type-btn.active.emergency {
+    background-color: #fef2f2; /* Vermelho claro */
+    border-color: #ef4444;
+    color: #b91c1c;
+}

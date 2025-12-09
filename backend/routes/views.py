@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from .services.osrm_service import get_nearest_service, get_route, get_geocode, get_reverse_geocode
 
+
 class OsrmNearestView(APIView):
     def get(self, request):
         lng = request.query_params.get('lng')
@@ -19,46 +20,52 @@ class OsrmNearestView(APIView):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
 class OsrmRouteView(APIView):
     def get(self, request):
         origin_lng = request.query_params.get('origin_lng')
         origin_lat = request.query_params.get('origin_lat')
         dest_lng = request.query_params.get('dest_lng')
         dest_lat = request.query_params.get('dest_lat')
-        # Aqui capturamos o profile que vem do React (walking, cycling, driving)
+
         profile = request.query_params.get('profile', 'driving')
+        # NOVO: Receber o tipo de rota (normal, tourist, climatic, emergency)
+        route_type = request.query_params.get('route_type', 'normal')
 
         if not all([origin_lng, origin_lat, dest_lng, dest_lat]):
             return Response({'error': 'All coordinates required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        coordinates = f"{origin_lng},{origin_lat};{dest_lng},{dest_lat}"
+        # Passamos as coordenadas separadas para ser mais fácil manipular no service
+        origin = (origin_lng, origin_lat)
+        dest = (dest_lng, dest_lat)
+
         try:
-            result = get_route(profile, coordinates)
+            # Enviamos agora o route_type para o serviço
+            result = get_route(profile, origin, dest, route_type)
             return Response(result)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
+# ... (Geocoding e ReverseGeocode mantêm-se iguais)
 class GeocodeView(APIView):
     def get(self, request):
         address = request.query_params.get('address')
-
         if not address:
             return Response({'error': 'Address parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
-
         try:
             result = get_geocode(address)
             return Response(result)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
 class ReverseGeocodeView(APIView):
     def get(self, request):
         lat = request.query_params.get('lat')
         lng = request.query_params.get('lng')
-
         if not lat or not lng:
             return Response({'error': 'Lat and Lng parameters are required'}, status=status.HTTP_400_BAD_REQUEST)
-
         try:
             result = get_reverse_geocode(lat, lng)
             return Response(result)
