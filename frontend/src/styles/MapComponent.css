@@ -20,7 +20,6 @@
     width: 380px;
     background: #ffffff;
     border-radius: 12px;
-    /* Sombra suave e difusa para dar elevação */
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0,0,0,0.04);
     z-index: 1000;
     padding: 24px;
@@ -32,7 +31,6 @@
     transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
-/* Título */
 .side-panel h2 {
     margin: 0;
     font-size: 20px;
@@ -55,7 +53,7 @@
 .input-group label {
     font-size: 11px;
     font-weight: 700;
-    color: #6b7280; /* Cinza médio */
+    color: #6b7280;
     text-transform: uppercase;
     letter-spacing: 0.8px;
     margin-left: 2px;
@@ -72,7 +70,6 @@
     transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-/* Foco no wrapper quando se clica no input */
 .input-wrapper:focus-within {
     border-color: #8c03fc;
     box-shadow: 0 0 0 3px rgba(140, 3, 252, 0.1);
@@ -89,13 +86,8 @@
     width: 100%;
 }
 
-.location-input:focus {
-    outline: none;
-}
-
-.location-input::placeholder {
-    color: #9ca3af;
-}
+.location-input:focus { outline: none; }
+.location-input::placeholder { color: #9ca3af; }
 
 /* =========================================
    4. Botões de Ícone (GPS e Mapa)
@@ -122,18 +114,12 @@
     transform: translateY(-1px);
 }
 
-.icon-btn:active {
-    transform: translateY(0);
-}
-
-/* Estado Ativo (Selecionando no mapa) */
 .icon-btn.active {
-    background-color: #f3e8ff; /* Roxo muito claro */
+    background-color: #f3e8ff;
     border-color: #8c03fc;
     color: #8c03fc;
 }
 
-/* Texto de ajuda */
 .coordinates-text {
     font-size: 12px;
     color: #8c03fc;
@@ -175,20 +161,13 @@
     filter: brightness(1.1);
 }
 
-.btn-primary:active:not(:disabled) {
-    transform: translateY(0);
-    box-shadow: 0 2px 4px rgba(140, 3, 252, 0.2);
-}
-
 .btn-primary:disabled {
     background: #e5e7eb;
     color: #9ca3af;
     cursor: not-allowed;
     box-shadow: none;
-    transform: none;
 }
 
-/* Botão Secundário (Limpar) */
 .btn-secondary {
     background: #f3f4f6;
     color: #4b5563;
@@ -206,66 +185,63 @@
 }
 
 /* =========================================
-   6. Animações e Scrollbar
+   6. Seletor de Tipo de Rota (NOVO)
    ========================================= */
-@keyframes slideDown {
-    from { opacity: 0; transform: translateY(-5px); }
-    to { opacity: 1; transform: translateY(0); }
+.route-type-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* 2 colunas */
+    gap: 12px;
+    margin-bottom: 5px;
 }
 
-.side-panel::-webkit-scrollbar {
-    width: 6px;
+.type-btn {
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #6b7280; /* Cinza desativado */
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    position: relative;
+    overflow: hidden;
 }
-.side-panel::-webkit-scrollbar-track {
-    background: transparent;
+
+.type-btn:hover {
+    background-color: #f9fafb;
+    border-color: #d1d5db;
+    transform: translateY(-1px);
 }
-.side-panel::-webkit-scrollbar-thumb {
-    background: #d1d5db;
-    border-radius: 10px;
+
+/* Estilo Ativo: Turística (Laranja) */
+.type-btn.tourist.active {
+    background-color: #fff7ed;
+    border-color: #f97316;
+    color: #c2410c;
+    box-shadow: 0 2px 4px rgba(249, 115, 22, 0.15);
 }
-.side-panel::-webkit-scrollbar-thumb:hover {
-    background: #9ca3af;
+
+/* Estilo Ativo: Climática (Azul/Verde) */
+.type-btn.climatic.active {
+    background-color: #eff6ff; /* Azul muito claro */
+    border-color: #3b82f6;
+    color: #1d4ed8;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.15);
+}
+
+/* Indicador visual de seleção (opcional, borda mais grossa) */
+.type-btn.active {
+    border-width: 2px;
+    padding: 11px; /* Compensa a borda para não mudar tamanho */
 }
 
 /* =========================================
-   7. Responsividade (Mobile)
-   ========================================= */
-@media (max-width: 768px) {
-    .side-panel {
-        top: auto;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        max-width: 100%;
-        border-radius: 20px 20px 0 0;
-        padding: 24px 20px; /* Mais padding lateral */
-        box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
-        max-height: 60vh;
-        animation: slideUp 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
-    }
-
-    .map-container-wrapper {
-        flex-direction: column;
-    }
-
-    /* Ajuste para o mapa não ficar escondido atrás do painel */
-    .leaflet-container {
-        height: 100vh !important;
-        width: 100%;
-        position: absolute !important;
-        top: 0;
-        left: 0;
-        z-index: 0;
-    }
-}
-
-@keyframes slideUp {
-    from { transform: translateY(100%); }
-    to { transform: translateY(0); }
-}
-
-/* =========================================
-   8. Estatísticas da Rota (Distância/Tempo)
+   7. Estatísticas
    ========================================= */
 .route-stats {
     background-color: #f8f9fa;
@@ -304,125 +280,26 @@
     color: #212529;
 }
 
-.stat-value small {
-    font-size: 12px;
-    font-weight: 400;
-    color: #6c757d;
-    margin-left: 2px;
-}
-/* =========================================
-   9. Seletor de Transporte
-   ========================================= */
-.transport-selector {
-    margin-top: 5px;
-    margin-bottom: 15px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
-.transport-selector label {
-    font-size: 11px;
-    font-weight: 700;
-    color: #6b7280;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    margin-left: 2px;
-}
-
-.mode-buttons {
-    display: flex;
-    gap: 8px;
-    background: #f9fafb;
-    padding: 4px;
-    border-radius: 8px;
-    border: 1px solid #e5e7eb;
-}
-
-.mode-btn {
-    flex: 1;
-    border: none;
-    background: transparent;
-    padding: 8px;
-    border-radius: 6px;
-    font-size: 13px;
-    font-weight: 500;
-    color: #6b7280;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 5px;
-}
-
-.mode-btn:hover {
-    background-color: #e5e7eb;
-    color: #374151;
-}
-
-/* Estilo para o botão selecionado */
-.mode-btn.active {
-    background-color: #ffffff;
-    color: #8c03fc;
-    font-weight: 600;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    border: 1px solid #e5e7eb; /* Opcional: contorno subtil */
-}
-
-
-/* =========================================
-   10. Seletor de Tipo de Rota
-   ========================================= */
-.route-type-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr; /* 2 colunas */
-    gap: 8px;
-    margin-bottom: 15px;
-}
-
-.type-btn {
-    border: 1px solid #e5e7eb;
-    background: #fff;
-    padding: 10px;
-    border-radius: 8px;
-    font-size: 12px;
-    font-weight: 600;
-    color: #4b5563;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-}
-
-.type-btn:hover {
-    background-color: #f9fafb;
-    border-color: #d1d5db;
-}
-
-/* Cores específicas para cada tipo quando ativo */
-.type-btn.active.normal {
-    background-color: #f3f4f6;
-    border-color: #6b7280;
-    color: #1f2937;
-}
-
-.type-btn.active.tourist {
-    background-color: #fff7ed; /* Laranja claro */
-    border-color: #f97316;
-    color: #c2410c;
-}
-
-.type-btn.active.climatic {
-    background-color: #ecfdf5; /* Verde claro */
-    border-color: #10b981;
-    color: #047857;
-}
-
-.type-btn.active.emergency {
-    background-color: #fef2f2; /* Vermelho claro */
-    border-color: #ef4444;
-    color: #b91c1c;
+/* Responsividade Mobile */
+@media (max-width: 768px) {
+    .side-panel {
+        top: auto;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        border-radius: 20px 20px 0 0;
+        padding: 24px 20px;
+        max-height: 60vh;
+        box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+    }
+    .leaflet-container {
+        height: 100vh !important;
+        position: absolute !important;
+        z-index: 0;
+    }
 }

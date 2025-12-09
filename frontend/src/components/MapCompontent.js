@@ -1,98 +1,92 @@
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, Polyline, useMap, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { fetchRoute, fetchGeocode, fetchReverseGeocode } from '../services/api';
 import '../styles/MapComponent.css';
 
-// --- Configuração dos Ícones ---
-const createIcon = (url) => new L.Icon({
-    iconUrl: process.env.PUBLIC_URL + url,
-    iconSize: [36, 36],
-    iconAnchor: [18, 36],
-    popupAnchor: [0, -36]
-});
-
-// Ícones de Transporte
+// ... (Configuração dos Ícones Estáticos - Carro, Casa, etc. - Mantém Igual) ...
+const createIcon = (url) => new L.Icon({ iconUrl: process.env.PUBLIC_URL + url, iconSize: [36, 36], iconAnchor: [18, 36], popupAnchor: [0, -36] });
 const carIcon = createIcon('/car_marker.png');
 const bikeIcon = createIcon('/bike_marker.png');
 const footIcon = createIcon('/foot_marker.png');
-
-// Outros Ícones
 const destinationIcon = createIcon('/destination_marker.png');
 const homeIcon = createIcon('/home_marker.png');
 
-// Ícone para Pontos Turísticos (Usamos um link externo ou um ficheiro local se tiveres)
-const touristIcon = new L.Icon({
-    iconUrl: 'https://cdn-icons-png.flaticon.com/512/3203/3203071.png',
-    iconSize: [22, 22],   // Tamanho reduzido (era 32, 32)
-    iconAnchor: [11, 22], // Ponto que toca no mapa (metade da largura, altura total)
-    popupAnchor: [0, -22] // Onde abre o balão de texto
-});
-
-// --- Componentes Auxiliares ---
-
-function LocationMarker({ selectionMode, handleMapClick }) {
-    useMapEvents({
-        click(e) {
-            if (selectionMode) {
-                handleMapClick(e.latlng, selectionMode);
-            }
-        }
-    });
+function ZoomTracker({ setZoom }) {
+    const map = useMapEvents({ zoomend: () => setZoom(map.getZoom()) });
     return null;
 }
-
+function LocationMarker({ selectionMode, handleMapClick }) {
+    useMapEvents({ click(e) { if (selectionMode) handleMapClick(e.latlng, selectionMode); } });
+    return null;
+}
 function MapCenterController({ centerCoords }) {
     const map = useMap();
-    useEffect(() => {
-        if (centerCoords) {
-            map.setView([centerCoords.lat, centerCoords.lng], 14, { animate: true });
-        }
-    }, [centerCoords, map]);
+    useEffect(() => { if (centerCoords) map.setView([centerCoords.lat, centerCoords.lng], 14, { animate: true }); }, [centerCoords, map]);
     return null;
 }
 
-// --- Componente Principal ---
-
 function MapComponent() {
-    // --- Estados de Dados ---
+    const [currentZoom, setCurrentZoom] = useState(13);
+
+    // --- Ícones Dinâmicos ---
+    const pointIcons = useMemo(() => {
+        const makeSet = (url) => ({
+            normal: new L.Icon({ iconUrl: url, iconSize: [24, 24], iconAnchor: [12, 24], popupAnchor: [0, -24] }),
+            small: new L.Icon({ iconUrl: url, iconSize: [16, 16], iconAnchor: [8, 16], popupAnchor: [0, -16] }),
+            mini: new L.Icon({ iconUrl: url, iconSize: [10, 10], iconAnchor: [5, 10], popupAnchor: [0, -10] })
+        });
+        return {
+            tourist: makeSet('https://cdn-icons-png.flaticon.com/512/3203/3203071.png'),
+            sun: makeSet('https://cdn-icons-png.flaticon.com/512/869/869869.png'),
+            rain: makeSet('https://cdn-icons-png.flaticon.com/512/1146/1146860.png')
+        };
+    }, []);
+
+    const getPointIcon = (category) => {
+        let iconSet = pointIcons.tourist;
+        if (category.includes('Sol') || category.includes('Sem Chuva') || category.includes('Limpo')) iconSet = pointIcons.sun;
+        else if (category.includes('Chuva') || category.includes('Alerta') || category.includes('Trovoada')) iconSet = pointIcons.rain;
+
+        if (currentZoom >= 15) return iconSet.normal;
+        if (currentZoom >= 12) return iconSet.small;
+        return iconSet.mini;
+    };
+
+    // --- Estados ---
     const [origin, setOrigin] = useState(null);
     const [destination, setDestination] = useState(null);
     const [originAddress, setOriginAddress] = useState("");
     const [destAddress, setDestAddress] = useState("");
 
-    const [route, setRoute] = useState(null);
-    const [routeInfo, setRouteInfo] = useState(null); // Distância e Tempo
-    const [touristSpots, setTouristSpots] = useState([]); // Lista de pontos turísticos
+    // NOVO: Opções booleanas em vez de string única
+    const [routeOptions, setRouteOptions] = useState({
+        tourist: false,
+        climatic: false
+    });
 
+    const [weatherSegments, setWeatherSegments] = useState([]);
+    const [routeInfo, setRouteInfo] = useState(null);
+    const [touristSpots, setTouristSpots] = useState([]);
     const [userLocation, setUserLocation] = useState(null);
     const [mapCenter, setMapCenter] = useState({ lat: 38.7119, lng: -9.2066 });
-
-    // --- Estados de UI/Configuração ---
     const [selectionMode, setSelectionMode] = useState(null);
-    const [transportMode, setTransportMode] = useState('driving'); // driving, cycling, walking
-    const [routeType, setRouteType] = useState('normal'); // normal, tourist, climatic, emergency
+    const [transportMode, setTransportMode] = useState('driving');
     const [isLoading, setIsLoading] = useState(false);
 
-    // 1. Inicializar GPS
     useEffect(() => {
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    const current = {
-                        lat: position.coords.latitude,
-                        lng: position.coords.longitude
-                    };
-                    setUserLocation(current);
-                    setMapCenter(prev => prev.lat === 38.7119 ? current : prev);
-                },
-                (error) => console.warn('Erro GPS:', error.message)
+                (pos) => {
+                    const c = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                    setUserLocation(c);
+                    setMapCenter(prev => prev.lat === 38.7119 ? c : prev);
+                }, (e) => console.warn(e)
             );
         }
     }, []);
 
-    // --- Helpers ---
     const getOriginIcon = () => {
         switch (transportMode) {
             case 'cycling': return bikeIcon;
@@ -100,275 +94,150 @@ function MapComponent() {
             default: return carIcon;
         }
     };
+    const formatDuration = (s) => s ? `${Math.round(s/60)} min` : "0 min";
+    const formatDistance = (m) => m ? (m < 1000 ? `${Math.round(m)} m` : `${(m/1000).toFixed(1)} km`) : "0 m";
 
-    const formatDuration = (seconds) => {
-        if (!seconds) return "0 min";
-        const minutes = Math.round(seconds / 60);
-        if (minutes < 60) return `${minutes} min`;
-        const hours = Math.floor(minutes / 60);
-        const remainingMins = minutes % 60;
-        return `${hours}h ${remainingMins}min`;
+    // --- Toggle Helper ---
+    const toggleOption = (option) => {
+        setRouteOptions(prev => ({
+            ...prev,
+            [option]: !prev[option]
+        }));
     };
 
-    const formatDistance = (meters) => {
-        if (!meters) return "0 m";
-        if (meters < 1000) return `${Math.round(meters)} m`;
-        return `${(meters / 1000).toFixed(1)} km`;
-    };
-
-    // --- Handlers ---
-
+    // --- Handlers (Resumidos) ---
     const handleMapSelect = async (latlng, mode) => {
-        setSelectionMode(null);
-        setIsLoading(true);
-        setRoute(null);
-        setTouristSpots([]); // Limpar pontos antigos
-        setRouteInfo(null);
-
+        setSelectionMode(null); setIsLoading(true); setWeatherSegments([]); setTouristSpots([]); setRouteInfo(null);
         try {
-            if (mode === 'origin') setOrigin(latlng);
-            else setDestination(latlng);
-
+            mode==='origin' ? setOrigin(latlng) : setDestination(latlng);
             try {
-                const response = await fetchReverseGeocode(latlng.lat, latlng.lng);
-                const address = response.data && response.data.display_name
-                    ? response.data.display_name
-                    : "Localização selecionada";
-
-                if (mode === 'origin') setOriginAddress(address);
-                else setDestAddress(address);
-            } catch (err) {
-                const coordString = `${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`;
-                if (mode === 'origin') setOriginAddress(coordString);
-                else setDestAddress(coordString);
-            }
-        } finally {
-            setIsLoading(false);
-        }
+                const res = await fetchReverseGeocode(latlng.lat, latlng.lng);
+                const addr = res.data?.display_name || "Localização";
+                mode==='origin' ? setOriginAddress(addr) : setDestAddress(addr);
+            } catch {}
+        } finally { setIsLoading(false); }
     };
 
     const handleAddressSearch = async (e, mode) => {
         if (e.key === 'Enter') {
-            setIsLoading(true);
-            setRoute(null);
-            setTouristSpots([]);
-            const textToSearch = mode === 'origin' ? originAddress : destAddress;
-
+            setIsLoading(true); setWeatherSegments([]); setTouristSpots([]); setRouteInfo(null);
             try {
-                const response = await fetchGeocode(textToSearch);
-                const results = response.data;
-
-                if (results && results.length > 0) {
-                    const coords = {
-                        lat: parseFloat(results[0].lat),
-                        lng: parseFloat(results[0].lon)
-                    };
-
-                    if (mode === 'origin') setOrigin(coords);
-                    else setDestination(coords);
-
-                    setMapCenter(coords);
-                } else {
-                    alert("Endereço não encontrado.");
-                }
-            } catch (error) {
-                console.error("Erro Geocode:", error);
-            } finally {
-                setIsLoading(false);
-            }
+                const res = await fetchGeocode(mode === 'origin' ? originAddress : destAddress);
+                if (res.data?.[0]) {
+                    const c = { lat: parseFloat(res.data[0].lat), lng: parseFloat(res.data[0].lon) };
+                    mode==='origin' ? setOrigin(c) : setDestination(c);
+                    setMapCenter(c);
+                } else alert("Não encontrado");
+            } catch {} finally { setIsLoading(false); }
         }
     };
 
     const handleUseCurrentLocation = async () => {
-        if (!userLocation) return alert("A aguardar GPS...");
-        setIsLoading(true);
-        setRoute(null);
-        setTouristSpots([]);
-
+        if (!userLocation) return alert("Sem GPS");
+        setIsLoading(true); setWeatherSegments([]); setTouristSpots([]); setRouteInfo(null);
         try {
-            const response = await fetchReverseGeocode(userLocation.lat, userLocation.lng);
-            const address = response.data.display_name || "Minha Localização";
-            setOrigin(userLocation);
-            setOriginAddress(address);
-            setMapCenter(userLocation);
-            if (selectionMode === 'origin') setSelectionMode(null);
-        } catch (error) {
-            console.error(error);
-            setOrigin(userLocation);
-            setOriginAddress("Minha Localização");
-        } finally {
-            setIsLoading(false);
-        }
+            const res = await fetchReverseGeocode(userLocation.lat, userLocation.lng);
+            setOrigin(userLocation); setOriginAddress(res.data?.display_name); setMapCenter(userLocation);
+            if(selectionMode) setSelectionMode(null);
+        } catch {} finally { setIsLoading(false); }
     };
 
-    // Calcular Rota Principal
     const traceRoute = async () => {
         if (!origin || !destination) return;
-
         setIsLoading(true);
-        // Limpar dados anteriores
-        setRoute(null);
+        setWeatherSegments([]);
         setTouristSpots([]);
-        setRouteInfo(null);
 
         try {
-            const response = await fetchRoute(
+            // PASSAR OS DOIS BOOLEANOS
+            const res = await fetchRoute(
                 origin.lng, origin.lat,
                 destination.lng, destination.lat,
                 transportMode,
-                routeType // Envia o tipo (tourist, normal, etc)
+                routeOptions.tourist, // isTourist
+                routeOptions.climatic // isClimatic
             );
 
-            if (response.data.routes && response.data.routes.length > 0) {
-                const routeData = response.data.routes[0];
-                const geometry = routeData.geometry;
+            if (res.data.routes?.length > 0) {
+                const rd = res.data.routes[0];
 
-                // 1. Desenhar linha
-                if (geometry && geometry.coordinates) {
-                    setRoute(geometry.coordinates.map(coord => [coord[1], coord[0]]));
+                if (res.data.weather_segments) {
+                    const processedSegments = res.data.weather_segments.map(seg => ({
+                        ...seg,
+                        coordinates: seg.coordinates.map(c => [c[1], c[0]])
+                    }));
+                    setWeatherSegments(processedSegments);
                 }
 
-                // 2. Definir Estatísticas
-                setRouteInfo({
-                    distance: routeData.distance,
-                    duration: routeData.duration
-                });
-
-                // 3. Adicionar Pontos Turísticos (se existirem na resposta)
-                if (response.data.tourist_spots && response.data.tourist_spots.length > 0) {
-                    setTouristSpots(response.data.tourist_spots);
-                }
-
-            } else {
-                alert("Não foi encontrada rota para este trajeto.");
-            }
-        } catch (error) {
-            console.error('Erro Route:', error);
-            alert("Erro ao calcular rota.");
-        } finally {
-            setIsLoading(false);
-        }
+                setRouteInfo({ distance: rd.distance, duration: rd.duration });
+                if (res.data.tourist_spots) setTouristSpots(res.data.tourist_spots);
+            } else alert("Rota não encontrada");
+        } catch (e) { console.error(e); alert("Erro rota"); } finally { setIsLoading(false); }
     };
 
     const handleClear = () => {
-        setOrigin(null);
-        setDestination(null);
-        setOriginAddress("");
-        setDestAddress("");
-        setRoute(null);
-        setRouteInfo(null);
-        setTouristSpots([]);
-        setSelectionMode(null);
+        setOrigin(null); setDestination(null); setOriginAddress(""); setDestAddress("");
+        setWeatherSegments([]); setRouteInfo(null); setTouristSpots([]); setSelectionMode(null);
     };
 
     return (
         <div className="map-container-wrapper">
-
-            {/* --- PAINEL LATERAL --- */}
             <div className="side-panel">
                 <h2>Planear Viagem</h2>
+                <div className="input-group"><label>Origem</label><div className="input-wrapper"><input value={originAddress} onChange={e=>setOriginAddress(e.target.value)} onKeyDown={e=>handleAddressSearch(e,'origin')} className="location-input"/><button className="icon-btn" onClick={handleUseCurrentLocation}>🏠</button><button className="icon-btn" onClick={()=>setSelectionMode('origin')}>📍</button></div></div>
+                <div className="input-group"><label>Destino</label><div className="input-wrapper"><input value={destAddress} onChange={e=>setDestAddress(e.target.value)} onKeyDown={e=>handleAddressSearch(e,'destination')} className="location-input"/><button className="icon-btn" onClick={()=>setSelectionMode('destination')}>📍</button></div></div>
+                <div className="input-group" style={{marginTop:'10px'}}><div style={{display:'flex',gap:'8px'}}>{['driving','cycling','walking'].map(m=><button key={m} className={`icon-btn ${transportMode===m?'active':''}`} onClick={()=>setTransportMode(m)} style={{flex:1,fontSize:'12px'}}>{m==='driving'?'🚗':m==='cycling'?'🚲':'🚶'}</button>)}</div></div>
 
-                {/* Inputs */}
-                <div className="input-group">
-                    <label>Ponto de Partida</label>
-                    <div className="input-wrapper">
-                        <input type="text" className="location-input" placeholder="Escreva e Enter..." value={originAddress} onChange={(e) => setOriginAddress(e.target.value)} onKeyDown={(e) => handleAddressSearch(e, 'origin')} />
-                        <button className="icon-btn" onClick={handleUseCurrentLocation} title="GPS">🏠</button>
-                        <button className={`icon-btn ${selectionMode === 'origin' ? 'active' : ''}`} onClick={() => setSelectionMode(selectionMode === 'origin' ? null : 'origin')} title="Mapa">📍</button>
-                    </div>
-                    {selectionMode === 'origin' && <span className="coordinates-text">Clique no mapa...</span>}
-                </div>
-
-                <div className="input-group">
-                    <label>Destino</label>
-                    <div className="input-wrapper">
-                        <input type="text" className="location-input" placeholder="Escreva e Enter..." value={destAddress} onChange={(e) => setDestAddress(e.target.value)} onKeyDown={(e) => handleAddressSearch(e, 'destination')} />
-                        <button className={`icon-btn ${selectionMode === 'destination' ? 'active' : ''}`} onClick={() => setSelectionMode(selectionMode === 'destination' ? null : 'destination')} title="Mapa">📍</button>
-                    </div>
-                    {selectionMode === 'destination' && <span className="coordinates-text">Clique no mapa...</span>}
-                </div>
-
-                {/* Meio de Transporte */}
-                <div className="input-group" style={{marginTop: '10px'}}>
-                    <label>Meio de Transporte</label>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                        <button className={`icon-btn ${transportMode === 'driving' ? 'active' : ''}`} onClick={() => setTransportMode('driving')} style={{flex: 1, fontSize: '13px', fontWeight: '500', width: 'auto'}}>🚗 Carro</button>
-                        <button className={`icon-btn ${transportMode === 'cycling' ? 'active' : ''}`} onClick={() => setTransportMode('cycling')} style={{flex: 1, fontSize: '13px', fontWeight: '500', width: 'auto'}}>🚲 Bike</button>
-                        <button className={`icon-btn ${transportMode === 'walking' ? 'active' : ''}`} onClick={() => setTransportMode('walking')} style={{flex: 1, fontSize: '13px', fontWeight: '500', width: 'auto'}}>🚶 A Pé</button>
-                    </div>
-                </div>
-
-                {/* Tipo de Rota */}
-                <div className="input-group" style={{marginTop: '10px'}}>
-                    <label>Tipo de Rota</label>
+                {/* --- SELETOR DE TIPO (Nova Lógica) --- */}
+                <div className="input-group" style={{marginTop:'10px'}}>
                     <div className="route-type-grid">
-                        <button className={`type-btn normal ${routeType === 'normal' ? 'active' : ''}`} onClick={() => setRouteType('normal')}>⚡ Rápida</button>
-                        <button className={`type-btn tourist ${routeType === 'tourist' ? 'active' : ''}`} onClick={() => setRouteType('tourist')}>📸 Turística</button>
-                        <button className={`type-btn climatic ${routeType === 'climatic' ? 'active' : ''}`} onClick={() => setRouteType('climatic')}>☁️ Climática</button>
-                        <button className={`type-btn emergency ${routeType === 'emergency' ? 'active' : ''}`} onClick={() => setRouteType('emergency')}>🚑 Emergência</button>
+                        <button
+                            className={`type-btn tourist ${routeOptions.tourist ? 'active' : ''}`}
+                            onClick={() => toggleOption('tourist')}
+                        >
+                            📸 Turística
+                        </button>
+                        <button
+                            className={`type-btn climatic ${routeOptions.climatic ? 'active' : ''}`}
+                            onClick={() => toggleOption('climatic')}
+                        >
+                            ☁️ Climática
+                        </button>
                     </div>
                 </div>
 
-                {/* Ações */}
-                <div className="actions-container">
-                    <button className="btn-primary" onClick={() => traceRoute()} disabled={!origin || !destination || isLoading}>
-                        {isLoading ? 'A processar...' : 'Calcular Rota'}
-                    </button>
-                    {(origin || destination) && <button className="btn-secondary" onClick={handleClear}>Limpar</button>}
-                </div>
-
-                {/* Estatísticas */}
-                {routeInfo && (
-                    <div className="route-stats">
-                        <div className="stat-item">
-                            <span className="stat-label">Tempo</span>
-                            <span className="stat-value">{formatDuration(routeInfo.duration)}</span>
-                        </div>
-                        <div className="stat-item">
-                            <span className="stat-label">Distância</span>
-                            <span className="stat-value">{formatDistance(routeInfo.distance)}</span>
-                        </div>
-                    </div>
-                )}
+                <div className="actions-container"><button className="btn-primary" onClick={()=>traceRoute()} disabled={!origin||!destination||isLoading}>{isLoading?'A carregar...':'Calcular Rota'}</button>{(origin||destination)&&<button className="btn-secondary" onClick={handleClear}>Limpar</button>}</div>
+                {routeInfo && <div className="route-stats"><div className="stat-item"><span>{formatDuration(routeInfo.duration)}</span></div><div className="stat-item"><span>{formatDistance(routeInfo.distance)}</span></div></div>}
             </div>
 
-            {/* --- MAPA --- */}
-            <MapContainer
-                center={[mapCenter.lat, mapCenter.lng]}
-                zoom={13}
-                zoomControl={false}
-                style={{ height: '100vh', width: '100%', cursor: selectionMode ? 'crosshair' : 'grab' }}
-            >
+            <MapContainer center={[mapCenter.lat, mapCenter.lng]} zoom={13} zoomControl={false} style={{ height: '100vh', width: '100%', cursor: selectionMode ? 'crosshair' : 'grab' }}>
                 <ZoomControl position="bottomright" />
                 <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap' />
                 <MapCenterController centerCoords={mapCenter} />
                 <LocationMarker selectionMode={selectionMode} handleMapClick={handleMapSelect} />
+                <ZoomTracker setZoom={setCurrentZoom} />
 
-
-                {userLocation && (<Marker position={userLocation} icon={homeIcon}><Popup>A sua localização</Popup></Marker>)}
+                {userLocation && <Marker position={userLocation} icon={homeIcon}><Popup>Eu</Popup></Marker>}
                 {origin && <Marker position={origin} icon={getOriginIcon()}><Popup>Origem</Popup></Marker>}
                 {destination && <Marker position={destination} icon={destinationIcon}><Popup>Destino</Popup></Marker>}
-                {/* Marcadores Turísticos */}
+
                 {touristSpots.map((spot, index) => (
-                    <Marker key={index} position={[spot.lat, spot.lon]} icon={touristIcon}>
-                        <Popup>
-                            <strong>📸 Ponto Turístico</strong><br/>
-                            {spot.name}
-                        </Popup>
+                    <Marker key={index} position={[spot.lat, spot.lon]} icon={getPointIcon(spot.category)}>
+                        <Popup><strong>{spot.category.includes('Alerta')?'🌦️ Meteo':'📸 Turismo'}</strong><br/>{spot.name}<br/><small>{spot.category}</small></Popup>
                     </Marker>
                 ))}
 
-                {route && (
-                    <>
-                        <Polyline positions={route} color="black" weight={6} opacity={0.6} />
-                        <Polyline
-                            positions={route}
-                            color={routeType === 'emergency' ? '#ef4444' : (routeType === 'tourist' ? '#f97316' : '#8c03fc')}
-                            weight={4}
-                            opacity={0.9}
-                        />
-                    </>
-                )}
+                {weatherSegments.map((segment, index) => (
+                    <Polyline
+                        key={index}
+                        positions={segment.coordinates}
+                        color={segment.color}
+                        weight={5}
+                        opacity={0.8}
+                    >
+                        <Popup>Tempo nesta zona: {segment.description}</Popup>
+                    </Polyline>
+                ))}
             </MapContainer>
         </div>
     );

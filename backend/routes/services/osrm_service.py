@@ -1,6 +1,6 @@
 import httpx
 import math
-from ..models import SimpleTouristPoint  # Importar o teu modelo
+from ..models import SimpleTouristPoint
 
 # Servidores
 SERVER_DRIVING = "router.project-osrm.org"
@@ -8,7 +8,9 @@ SERVER_BIKE = "routing.openstreetmap.de/routed-bike"
 SERVER_FOOT = "routing.openstreetmap.de/routed-foot"
 NOMINATIM_SERVER = "nominatim.openstreetmap.org"
 
-# Raio de desvio (50 metros)
+# API Open-Meteo
+OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
+
 DEFAULT_DETOUR_RADIUS = 50
 
 
@@ -21,157 +23,215 @@ def get_osrm_config(profile):
         return SERVER_DRIVING, 'driving'
 
 
-# --- Helpers de Cálculo ---
-
+# --- HELPERS MATEMÁTICOS ---
 def haversine_distance(coord1, coord2):
-    """ Calcula distância em metros entre dois pontos (lat, lng) """
     R = 6371000
-    # OSRM devolve [lng, lat], a nossa BD tem lat/lng separados
-    # Aqui assumimos input como tuplos (lng, lat)
     lon1, lat1 = float(coord1[0]), float(coord1[1])
     lon2, lat2 = float(coord2[0]), float(coord2[1])
-
     phi1, phi2 = math.radians(lat1), math.radians(lat2)
     dphi = math.radians(lat2 - lat1)
     dlambda = math.radians(lon2 - lon1)
-
     a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
     return R * (2 * math.atan2(math.sqrt(a), math.sqrt(1 - a)))
 
 
-# --- CONSULTA LOCAL (A parte nova e rápida) ---
+# --- METEOROLOGIA OTIMIZADA (BATCH REQUEST) ---
 
-def find_pois_near_point_local(lat, lng, radius=DEFAULT_DETOUR_RADIUS, exclude_names=[]):
+def get_weather_batch(points):
     """
-    Consulta a base de dados SQLite local.
+    Recebe uma lista de pontos [(lat, lon), (lat, lon), ...]
+    Faz UM ÚNICO pedido à API para todos os pontos.
     """
-    # 1. Filtro grosso (Bounding Box) para ser rápido
-    # 0.001 graus ~= 111 metros. Criamos uma caixa à volta do ponto.
+    if not points:
+        return []
+
+    # Separa lats e lons em listas separadas por vírgula
+    lats = [str(p[0]) for p in points]
+    lons = [str(p[1]) for p in points]
+
+    params = {
+        'latitude': ",".join(lats),
+        'longitude': ",".join(lons),
+        'current': 'weather_code,temperature_2m',
+        'timezone': 'auto'
+    }
+
+    try:
+        # Timeout curto é suficiente porque é só 1 pedido
+        response = httpx.get(OPEN_METEO_URL, params=params, timeout=3.0)
+
+        if response.status_code == 200:
+            data = response.json()
+
+            # Se for só 1 ponto, a API devolve objeto. Se forem vários, devolve lista.
+            if isinstance(data, list):
+                return [item.get('current', {}) for item in data]
+            else:
+                return [data.get('current', {})]
+
+    except Exception as e:
+        print(f"Erro Batch Weather: {e}")
+
+    # Se falhar, retorna lista vazia do tamanho dos pontos para não quebrar indices
+    return [None] * len(points)
+
+
+def get_weather_color_and_desc(code):
+    if code is None: return '#8c03fc', 'Desconhecido'  # Fallback
+    if code <= 1: return '#f59e0b', 'Sol ☀️'
+    if code <= 3: return '#6b7280', 'Nublado ☁️'
+    if code <= 48: return '#9ca3af', 'Nevoeiro 🌫️'
+    if code <= 67: return '#3b82f6', 'Chuva 🌧️'
+    if code <= 77: return '#06b6d4', 'Neve ❄️'
+    if code <= 82: return '#2563eb', 'Aguaceiros 💧'
+    if code >= 95: return '#1e3a8a', 'Trovoada ⚡'
+    return '#8c03fc', 'Normal'
+
+
+# --- LÓGICA TURISMO (BD Local) ---
+def find_pois_near_point_local(lat, lng, radius, exclude_names=[]):
     delta = 0.0015
-
     min_lat, max_lat = lat - delta, lat + delta
     min_lon, max_lon = lng - delta, lng + delta
-
-    # Query Django
     candidates = SimpleTouristPoint.objects.filter(
         lat__gte=min_lat, lat__lte=max_lat,
         lng__gte=min_lon, lng__lte=max_lon
     ).exclude(name__in=exclude_names)
-
-    found_pois = []
-
-    # 2. Refinamento (Distância exata)
+    found = []
     for poi in candidates:
-        # Nota: haversine espera (lng, lat)
-        dist = haversine_distance((lng, lat), (poi.lng, poi.lat))
-
-        if dist <= radius:
-            found_pois.append({
-                'lat': poi.lat,
-                'lon': poi.lng,
-                'name': poi.name,
-                'category': poi.category
-            })
-
-    return found_pois
+        if haversine_distance((lng, lat), (poi.lng, poi.lat)) <= radius:
+            found.append({'lat': poi.lat, 'lon': poi.lng, 'name': poi.name, 'category': poi.category})
+    return found
 
 
-# --- OSRM Core ---
-
+# --- OSRM CORE ---
 def get_osrm_request(service, version, profile, coords_str, options):
     server, internal_profile = get_osrm_config(profile)
     protocol = "https" if "openstreetmap.de" in server else "http"
     url = f"{protocol}://{server}/{service}/{version}/{internal_profile}/{coords_str}.json"
     if options: url += "?" + "&".join(options)
-
-    # print(f"OSRM Call: {url}")
     response = httpx.get(url, timeout=30)
     response.raise_for_status()
     return response.json()
 
 
-def get_route(profile, origin, dest, route_type='normal'):
+# --- FUNÇÃO PRINCIPAL ATUALIZADA ---
+def get_route(profile, origin, dest, is_tourist=False, is_climatic=False):
     """
-    Lógica Principal de Roteamento
-    origin/dest: tuplos (lng, lat)
+    Combina Turística (Desvio) e Climática (Batch Request Otimizado)
     """
-    all_tourist_spots = []
+    waypoints_str = ""
+    extra_info_markers = []
 
-    if route_type == 'tourist':
-        print(f"--- Rota Turística Local (Raio: {DEFAULT_DETOUR_RADIUS}m) ---")
-
-        # 1. Obter rota base para saber o caminho
+    # 1. PROCESSAR TURISMO
+    if is_tourist:
         base_coords = f"{origin[0]},{origin[1]};{dest[0]},{dest[1]}"
         try:
-            base_route = get_osrm_request("route", "v1", profile, base_coords, ["overview=full", "geometries=geojson"])
-        except:
-            return {'error': 'Falha rota base'}
+            base_route = get_osrm_request("route", "v1", profile, base_coords, ["geometries=geojson"])
+            if base_route.get('routes'):
+                geo = base_route['routes'][0]['geometry']['coordinates']
+                step = max(1, int(len(geo) * 0.03))
+                seen = set()
+                route_waypoints = []
+                radius = 50 if profile == 'walking' else (200 if profile == 'cycling' else 500)
 
-        route_waypoints = []
-        seen_names = set()
+                for i in range(0, len(geo), step):
+                    pt = geo[i]
+                    pois = find_pois_near_point_local(pt[1], pt[0], radius, list(seen))
+                    if pois:
+                        for p in pois:
+                            if p['name'] not in seen:
+                                extra_info_markers.append(p)
+                                if len(route_waypoints) < 15:
+                                    route_waypoints.append(f"{p['lon']},{p['lat']}")
+                                seen.add(p['name'])
+                if route_waypoints:
+                    waypoints_str = ";".join(route_waypoints)
+        except Exception as e:
+            print(f"Erro Turismo: {e}")
 
-        if base_route.get('routes'):
-            geometry = base_route['routes'][0]['geometry']['coordinates']  # Lista de [lng, lat]
-            total_points = len(geometry)
-
-            # 2. Verificar pontos ao longo da rota
-            # Como a BD é local e rápida, podemos verificar MAIS pontos sem perder performance.
-            # Vamos verificar a cada 2% do caminho (muito detalhado)
-            step = max(1, int(total_points * 0.02))
-            indices_to_check = range(0, total_points, step)
-
-            for idx in indices_to_check:
-                pt = geometry[idx]  # [lng, lat]
-
-                # Chamada à função LOCAL
-                pois = find_pois_near_point_local(
-                    pt[1], pt[0],  # lat, lng
-                    radius=DEFAULT_DETOUR_RADIUS,
-                    exclude_names=list(seen_names)
-                )
-
-                if pois:
-                    for poi in pois:
-                        if poi['name'] not in seen_names:
-                            print(f"📍 Encontrado na BD: {poi['name']}")
-                            all_tourist_spots.append(poi)
-                            route_waypoints.append(f"{poi['lon']},{poi['lat']}")
-                            seen_names.add(poi['name'])
-
-        # 3. Construir rota final
-        if route_waypoints:
-            # OSRM tem limite de URL (~20-30 waypoints é seguro)
-            # Se tivermos muitos pontos turísticos, pegamos nos 20 mais distribuídos
-            waypoints_str = ";".join(route_waypoints[:20])
-            final_coords = f"{origin[0]},{origin[1]};{waypoints_str};{dest[0]},{dest[1]}"
-        else:
-            final_coords = base_coords
-
+    # 2. CONSTRUIR ROTA FINAL
+    if waypoints_str:
+        final_coords = f"{origin[0]},{origin[1]};{waypoints_str};{dest[0]},{dest[1]}"
     else:
-        # Rota Normal
         final_coords = f"{origin[0]},{origin[1]};{dest[0]},{dest[1]}"
 
-    # Chamada Final
     try:
-        final_data = get_osrm_request("route", "v1", profile, final_coords,
+        route_data = get_osrm_request("route", "v1", profile, final_coords,
                                       ["steps=true", "geometries=geojson", "overview=full"])
-        final_data['tourist_spots'] = all_tourist_spots
-        return final_data
-    except Exception as e:
-        print(f"Erro na rota final OSRM: {e}")
-        fallback = get_osrm_request("route", "v1", profile, f"{origin[0]},{origin[1]};{dest[0]},{dest[1]}",
-                                    ["geometries=geojson"])
-        fallback['tourist_spots'] = all_tourist_spots
-        return fallback
+    except:
+        return {'error': 'Falha na rota final'}
+
+    # 3. PROCESSAR SEGMENTOS DE COR (OTIMIZADO)
+    weather_segments = []
+
+    if route_data.get('routes'):
+        main_route = route_data['routes'][0]
+        geometry = main_route['geometry']['coordinates']
+        total_distance = main_route['distance']
+
+        if is_climatic:
+            print("--- Pintura Climática (Modo Rápido/Batch) ---")
+            SEGMENT_RESOLUTION = 5000 if total_distance > 200000 else (3000 if total_distance > 50000 else 1500)
+
+            # Passo A: Criar todos os segmentos primeiro (sem chamar API)
+            segments_to_process = []
+            current_segment = []
+            accumulated_dist = 0
+            last_pt = None
+
+            for i, pt in enumerate(geometry):
+                current_segment.append(pt)
+                if last_pt: accumulated_dist += haversine_distance(last_pt, pt)
+
+                if accumulated_dist >= SEGMENT_RESOLUTION or i == len(geometry) - 1:
+                    # Guardamos o segmento e o seu ponto médio
+                    mid_pt = current_segment[len(current_segment) // 2]
+                    segments_to_process.append({
+                        'coords': current_segment,
+                        'midpoint': (mid_pt[1], mid_pt[0])  # lat, lon
+                    })
+                    current_segment = [pt]
+                    accumulated_dist = 0
+                last_pt = pt
+
+            # Passo B: Fazer UM pedido API para todos os pontos médios
+            midpoints = [seg['midpoint'] for seg in segments_to_process]
+            weather_results = get_weather_batch(midpoints)
+
+            # Passo C: Associar cores
+            for i, seg in enumerate(segments_to_process):
+                weather = weather_results[i]
+                color = '#8c03fc'
+                desc = 'Desconhecido'
+
+                if weather:
+                    code = weather.get('weather_code', 0)
+                    color, desc = get_weather_color_and_desc(code)
+
+                weather_segments.append({
+                    'coordinates': seg['coords'],
+                    'color': color,
+                    'description': desc
+                })
+
+        elif is_tourist:
+            weather_segments = [{'coordinates': geometry, 'color': '#f97316', 'description': 'Rota Turística'}]
+        else:
+            weather_segments = [{'coordinates': geometry, 'color': '#8c03fc', 'description': 'Rota Normal'}]
+
+    route_data['weather_segments'] = weather_segments
+    route_data['tourist_spots'] = extra_info_markers
+
+    return route_data
 
 
-# --- Helpers Nominatim ---
+# --- HELPERS API ---
 def get_nominatim_request(endpoint, params):
     url = f"https://{NOMINATIM_SERVER}/{endpoint}"
     headers = {'User-Agent': 'BetterMaps-App/1.0'}
     params['format'] = 'json'
     response = httpx.get(url, params=params, headers=headers, timeout=10)
-    response.raise_for_status()
     return response.json()
 
 
