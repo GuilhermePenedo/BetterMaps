@@ -1,314 +1,307 @@
-import {MapContainer, TileLayer, Marker, Popup, useMapEvents, Polyline, useMap, ZoomControl} from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents, Polyline, useMap, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useState, useEffect } from 'react';
-import { fetchRoute } from '../services/api';
+import { fetchRoute, fetchGeocode, fetchReverseGeocode } from '../services/api';
 import '../styles/MapComponent.css';
 
-function LocationMarker({ onSelect, isSelectingOrigin }) {
+// --- Configuração dos Ícones (Mantida Igual) ---
+const createIcon = (url) => new L.Icon({
+    iconUrl: process.env.PUBLIC_URL + url,
+    iconSize: [36, 36],
+    iconAnchor: [18, 36],
+    popupAnchor: [0, -36]
+});
+
+const originIcon = createIcon('/origin_marker.png');
+const destinationIcon = createIcon('/destination_marker.png');
+const homeIcon = createIcon('/home_marker.png');
+
+// --- Componentes Auxiliares (Mantidos Iguais) ---
+function LocationMarker({ selectionMode, handleMapClick }) {
     useMapEvents({
         click(e) {
-            onSelect(e.latlng);
+            if (selectionMode) {
+                handleMapClick(e.latlng, selectionMode);
+            }
         }
     });
     return null;
 }
 
-// Componente para controlar o mapa e centrar na geolocalização
-function MapCenterController({ userLocation }) {
+function MapCenterController({ centerCoords }) {
     const map = useMap();
-    
     useEffect(() => {
-        if (userLocation) {
-            map.setView([userLocation.lat, userLocation.lng], 15);
+        if (centerCoords) {
+            map.setView([centerCoords.lat, centerCoords.lng], 14, { animate: true });
         }
-    }, [userLocation, map]);
-    
+    }, [centerCoords, map]);
     return null;
 }
 
 function MapComponent() {
-
-    const customIcon = new L.Icon({
-        iconUrl: process.env.PUBLIC_URL + '/marker.png',
-        iconSize: [36, 36],
-        iconAnchor: [18, 36],
-        popupAnchor: [0, -36]
-    });
-
-    const originIcon = new L.Icon({
-        iconUrl: process.env.PUBLIC_URL + '/origin_marker.png',
-        iconSize: [36, 36],
-        iconAnchor: [18, 36],
-        popupAnchor: [0, -36],
-        className: 'origin-marker'
-    });
-
-    const destinationIcon = new L.Icon({
-        iconUrl: process.env.PUBLIC_URL + '/destination_marker.png',
-        iconSize: [36, 36],
-        iconAnchor: [18, 36],
-        popupAnchor: [0, -36],
-        className: 'destination-marker'
-    });
-
-    const homeIcon = new L.Icon({
-        iconUrl: process.env.PUBLIC_URL + '/home_marker.png',
-        iconSize: [36, 36],
-        iconAnchor: [18, 36],
-        popupAnchor: [0, -36],
-        className: 'home-marker'
-    });
-
-    const [destination, setDestination] = useState(null);
+    // --- Estados ---
     const [origin, setOrigin] = useState(null);
+    const [destination, setDestination] = useState(null);
+    const [originAddress, setOriginAddress] = useState("");
+    const [destAddress, setDestAddress] = useState("");
     const [route, setRoute] = useState(null);
-    const [isSelectingOrigin, setIsSelectingOrigin] = useState(false);
     const [userLocation, setUserLocation] = useState(null);
-    const [mapCenter, setMapCenter] = useState([38.711944321907616, -9.206683151026464]);
+    const [mapCenter, setMapCenter] = useState(null);
+    const [selectionMode, setSelectionMode] = useState(null);
+    const [isLoading, setIsLoading] = useState(false);
 
-    // Pedir geolocalização ao montar o componente
+    // 1. GPS ao Iniciar
     useEffect(() => {
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 (position) => {
-                    const currentLocation = {
+                    const current = {
                         lat: position.coords.latitude,
                         lng: position.coords.longitude
                     };
-                    setUserLocation(currentLocation);
-                    setMapCenter([currentLocation.lat, currentLocation.lng]);
-                    console.log('Localização obtida:', currentLocation);
+                    setUserLocation(current);
+                    if (!mapCenter) setMapCenter(current);
                 },
-                (error) => {
-                    console.warn('Geolocalização não concedida ou indisponível:', error.message);
-                    // Mantém a localização padrão (Lisboa)
-                }
+                (error) => console.warn('Erro GPS:', error.message)
             );
         }
     }, []);
 
-    const handleDestinationSelect = (latlng) => {
-        if (!isSelectingOrigin) {
-            setDestination(latlng);
-            setIsSelectingOrigin(true);
+    // REMOVIDO: O useEffect que calculava a rota automaticamente foi apagado.
+
+    // --- Lógica de Negócio ---
+
+    // Ação: Clicar no Mapa
+    const handleMapSelect = async (latlng, mode) => {
+        setSelectionMode(null);
+        setIsLoading(true);
+        setRoute(null); // LIMPAR ROTA ANTIGA ao mudar um ponto
+
+        try {
+            if (mode === 'origin') setOrigin(latlng);
+            else setDestination(latlng);
+
+            const response = await fetchReverseGeocode(latlng.lat, latlng.lng);
+            const address = response.data.display_name || "Localização selecionada";
+
+            if (mode === 'origin') setOriginAddress(address);
+            else setDestAddress(address);
+
+        } catch (error) {
+            console.error("Erro Reverse Geocode:", error);
+            const fallback = `${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`;
+            if (mode === 'origin') setOriginAddress(fallback);
+            else setDestAddress(fallback);
+        } finally {
+            setIsLoading(false);
         }
     };
 
-    const handleOriginSelect = (latlng) => {
-        if (isSelectingOrigin) {
-            setOrigin(latlng);
-            traceRoute(latlng, destination);
-            setIsSelectingOrigin(false);
-        }
-    };
+    // Ação: Escrever e dar Enter
+    const handleAddressSearch = async (e, mode) => {
+        if (e.key === 'Enter') {
+            setIsLoading(true);
+            setRoute(null); // LIMPAR ROTA ANTIGA ao mudar um ponto
+            const textToSearch = mode === 'origin' ? originAddress : destAddress;
 
-    const handleStartRoute = (destinationPoint) => {
-        setDestination(destinationPoint);
-        setIsSelectingOrigin(true);
-    };
+            try {
+                const response = await fetchGeocode(textToSearch);
+                const results = response.data;
 
-    const handleUseCurrentLocation = () => {
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    const currentLocation = {
-                        lat: position.coords.latitude,
-                        lng: position.coords.longitude
+                if (results && results.length > 0) {
+                    const coords = {
+                        lat: parseFloat(results[0].lat),
+                        lng: parseFloat(results[0].lon)
                     };
-                    setOrigin(currentLocation);
-                    setUserLocation(currentLocation);
-                    if (destination) {
-                        traceRoute(currentLocation, destination);
-                        setIsSelectingOrigin(false);
-                    }
-                },
-                (error) => {
-                    console.error('Erro ao obter localização:', error);
-                    alert('Não foi possível obter a sua localização. Por favor, clique no mapa para selecionar a origem.');
+
+                    if (mode === 'origin') setOrigin(coords);
+                    else setDestination(coords);
+
+                    setMapCenter(coords);
+                } else {
+                    alert("Endereço não encontrado.");
                 }
-            );
+            } catch (error) {
+                console.error("Erro Geocode:", error);
+                alert("Erro ao pesquisar endereço.");
+            } finally {
+                setIsLoading(false);
+            }
         }
     };
 
-    const traceRoute = async (originPoint, destinationPoint) => {
+    // Ação: Botão GPS
+    const handleUseCurrentLocation = async () => {
+        if (!userLocation) {
+            alert("Localização GPS ainda não disponível.");
+            return;
+        }
+
+        setIsLoading(true);
+        setRoute(null); // LIMPAR ROTA ANTIGA
+
+        try {
+            const response = await fetchReverseGeocode(userLocation.lat, userLocation.lng);
+            setOrigin(userLocation);
+            setOriginAddress(response.data.display_name || "Minha Localização");
+            setMapCenter(userLocation);
+
+            if (selectionMode === 'origin') setSelectionMode(null);
+        } catch (error) {
+            console.error(error);
+            setOrigin(userLocation);
+            setOriginAddress("Minha Localização");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Ação: Calcular Rota (AGORA SÓ CHAMADO PELO BOTÃO)
+    const traceRoute = async () => {
+        // Validação extra para garantir que temos os dois pontos
+        if (!origin || !destination) return;
+
+        setIsLoading(true);
         try {
             const response = await fetchRoute(
-                originPoint.lng, 
-                originPoint.lat, 
-                destinationPoint.lng, 
-                destinationPoint.lat
+                origin.lng,
+                origin.lat,
+                destination.lng,
+                destination.lat
             );
-            
-            // OSRM retorna geometria GeoJSON
+
             if (response.data.routes && response.data.routes.length > 0) {
                 const geometry = response.data.routes[0].geometry;
-                if (geometry && geometry.coordinates) {
-                    setRoute(geometry.coordinates.map(coord => [coord[1], coord[0]]));
-                } else {
-                    console.error('Geometria não encontrada na resposta:', response.data);
-                    alert('Erro: Geometria da rota não encontrada');
-                }
+                setRoute(geometry.coordinates.map(coord => [coord[1], coord[0]]));
             } else {
-                console.error('Nenhuma rota encontrada na resposta:', response.data);
-                alert('Erro: Nenhuma rota disponível entre estes pontos');
+                alert("Rota não encontrada.");
             }
         } catch (error) {
-            console.error('Erro ao traçar rota:', error);
-            console.error('Response:', error.response?.data);
-            alert(`Erro ao calcular rota: ${error.response?.data?.error || error.message}`);
+            console.error('Erro Route:', error);
+            alert("Não foi possível calcular a rota.");
+        } finally {
+            setIsLoading(false);
         }
     };
 
-    const handleCancelRoute = () => {
-        setDestination(null);
+    const handleClear = () => {
         setOrigin(null);
+        setDestination(null);
+        setOriginAddress("");
+        setDestAddress("");
         setRoute(null);
-        setIsSelectingOrigin(false);
+        setSelectionMode(null);
     };
 
-    const handleClearAll = () => {
-        setDestination(null);
-        setOrigin(null);
-        setRoute(null);
-        setIsSelectingOrigin(false);
-        // NÃO reseta userLocation para manter o marcador de casa
-    };
-
+    // --- Renderização ---
     return (
         <div className="map-container-wrapper">
-            <MapContainer 
-                center={mapCenter} 
+
+            {/* PAINEL LATERAL */}
+            <div className="side-panel">
+                <h2>Planear Viagem</h2>
+
+                {/* ORIGEM */}
+                <div className="input-group">
+                    <label>Ponto de Partida</label>
+                    <div className="input-wrapper">
+                        <input
+                            type="text"
+                            className="location-input"
+                            placeholder="Escreva e Enter..."
+                            value={originAddress}
+                            onChange={(e) => setOriginAddress(e.target.value)}
+                            onKeyDown={(e) => handleAddressSearch(e, 'origin')}
+                        />
+                        <button
+                            className="icon-btn"
+                            onClick={handleUseCurrentLocation}
+                            title="Usar GPS"
+                        >🏠</button>
+                        <button
+                            className={`icon-btn ${selectionMode === 'origin' ? 'active' : ''}`}
+                            onClick={() => setSelectionMode(selectionMode === 'origin' ? null : 'origin')}
+                            title="Escolher no mapa"
+                        >📍</button>
+                    </div>
+                    {selectionMode === 'origin' && <span className="coordinates-text highlight">Clique no mapa...</span>}
+                </div>
+
+                {/* DESTINO */}
+                <div className="input-group">
+                    <label>Destino</label>
+                    <div className="input-wrapper">
+                        <input
+                            type="text"
+                            className="location-input"
+                            placeholder="Escreva e Enter..."
+                            value={destAddress}
+                            onChange={(e) => setDestAddress(e.target.value)}
+                            onKeyDown={(e) => handleAddressSearch(e, 'destination')}
+                        />
+                        <button
+                            className={`icon-btn ${selectionMode === 'destination' ? 'active' : ''}`}
+                            onClick={() => setSelectionMode(selectionMode === 'destination' ? null : 'destination')}
+                            title="Escolher no mapa"
+                        >📍</button>
+                    </div>
+                    {selectionMode === 'destination' && <span className="coordinates-text highlight">Clique no mapa...</span>}
+                </div>
+
+                {/* AÇÕES */}
+                <div className="actions-container">
+                    <button
+                        className="btn-primary"
+                        // Agora chamamos traceRoute sem argumentos, pois ele usa o estado origin/destination
+                        onClick={() => traceRoute()}
+                        disabled={!origin || !destination || isLoading}
+                    >
+                        {isLoading ? 'A processar...' : 'Calcular Rota'}
+                    </button>
+
+                    {(origin || destination) && (
+                        <button
+                            className="btn-secondary"
+                            onClick={handleClear}
+                        >
+                            Limpar
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            {/* MAPA */}
+            <MapContainer
+                center={[38.7119, -9.2066]}
                 zoom={13}
                 zoomControl={false}
-                style={{ height: '100vh', width: '100%', cursor: isSelectingOrigin ? 'crosshair' : 'default' }}
+                style={{ height: '100vh', width: '100%', cursor: selectionMode ? 'crosshair' : 'grab' }}
             >
                 <ZoomControl position="bottomright" />
                 <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    attribution='&copy; OpenStreetMap contributors'
                 />
-                <MapCenterController userLocation={userLocation} />
-                <LocationMarker onSelect={isSelectingOrigin ? handleOriginSelect : handleDestinationSelect} />
-                
-                {/* Marker de Destino */}
-                {destination && (
-                    <Marker position={destination} icon={destinationIcon}>
-                        <Popup>
-                            <div>
-                                <strong>Destino</strong><br />
-                                Latitude: {destination.lat.toFixed(6)}<br />
-                                Longitude: {destination.lng.toFixed(6)}
-                            </div>
-                        </Popup>
-                    </Marker>
-                )}
 
-                {/* Marker de Origem */}
-                {origin && (
-                    <Marker position={origin} icon={originIcon}>
-                        <Popup>
-                            <div>
-                                <strong>Origem</strong><br />
-                                Latitude: {origin.lat.toFixed(6)}<br />
-                                Longitude: {origin.lng.toFixed(6)}
-                            </div>
-                        </Popup>
-                    </Marker>
-                )}
+                <MapCenterController centerCoords={mapCenter} />
 
-                {/* Marcador de localização atual do utilizador (quando não é origem) */}
-                {userLocation && !origin && (
-                    <Marker 
-                        position={[userLocation.lat, userLocation.lng]} 
-                        icon={homeIcon}
-                    >
-                        <Popup>
-                            <div>
-                                <strong>Sua Localização</strong><br />
-                                Latitude: {userLocation.lat.toFixed(6)}<br />
-                                Longitude: {userLocation.lng.toFixed(6)}
-                            </div>
-                        </Popup>
-                    </Marker>
-                )}
-                
-                {/* Linha da rota */}
+                <LocationMarker
+                    selectionMode={selectionMode}
+                    handleMapClick={handleMapSelect}
+                />
+
+                {origin && <Marker position={origin} icon={originIcon}><Popup>Origem</Popup></Marker>}
+                {destination && <Marker position={destination} icon={destinationIcon}><Popup>Destino</Popup></Marker>}
+                {userLocation && <Marker position={userLocation} icon={homeIcon}><Popup>GPS Atual</Popup></Marker>}
+
                 {route && (
-                      <>
-                        {/* 1. A "Borda" (Linha de fundo, mais grossa e preta) */}
-                        <Polyline
-                          positions={route}
-                          color="black"
-                          weight={5} // 4 (peso da frente) + 2px de borda
-                          opacity={1}
-                        />
-
-                        {/* 2. A Linha Principal (Frente, colorida) */}
-                        <Polyline
-                          positions={route}
-                          color="#8c03fc"
-                          weight={4}
-                          opacity={0.7}
-                        />
-                      </>
-                    )}
-            </MapContainer>
-
-            {/* Painel Lateral */}
-            <div className="side-panel">
-                {!destination ? (
-                    <div className="panel-content">
-                        <h3>Selecionar Rota</h3>
-                        <p>Clique no mapa para definir o seu destino</p>
-                    </div>
-                ) : !origin ? (
-                    <div className="panel-content">
-                        <h3>Escolher Origem</h3>
-                        <div className="destination-info">
-                            <p><strong>Destino:</strong></p>
-                            <p>Latitude: {destination.lat.toFixed(6)}</p>
-                            <p>Longitude: {destination.lng.toFixed(6)}</p>
-                        </div>
-                        <button 
-                            className="btn btn-primary"
-                            onClick={handleUseCurrentLocation}
-                        >
-                            📍 Usar Localização Atual
-                        </button>
-                        <p className="or-divider">ou</p>
-                        <p className="instructions">Clique no mapa para selecionar a origem</p>
-                        <button 
-                            className="btn btn-secondary"
-                            onClick={handleCancelRoute}
-                        >
-                            Cancelar
-                        </button>
-                    </div>
-                ) : (
-                    <div className="panel-content">
-                        <h3>Rota Traçada</h3>
-                        <div className="route-info">
-                            <div className="info-section">
-                                <p><strong>Origem:</strong></p>
-                                <p>Latitude: {origin.lat.toFixed(6)}</p>
-                                <p>Longitude: {origin.lng.toFixed(6)}</p>
-                            </div>
-                            <div className="info-section">
-                                <p><strong>Destino:</strong></p>
-                                <p>Latitude: {destination.lat.toFixed(6)}</p>
-                                <p>Longitude: {destination.lng.toFixed(6)}</p>
-                            </div>
-                        </div>
-                        <button 
-                            className="btn btn-secondary"
-                            onClick={handleClearAll}
-                        >
-                            Nova Rota
-                        </button>
-                    </div>
+                    <>
+                        <Polyline positions={route} color="black" weight={6} opacity={1} />
+                        <Polyline positions={route} color="#8c03fc" weight={4} opacity={0.8} />
+                    </>
                 )}
-            </div>
+            </MapContainer>
         </div>
     );
 }

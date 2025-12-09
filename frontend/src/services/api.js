@@ -19,3 +19,10 @@ export const fetchRoute = (originLng, originLat, destLng, destLat, profile = 'dr
       profile 
     } 
   });
+
+export const fetchGeocode = (address) =>
+  api.get(`/geocode/`, { params: { address } });
+
+// Coordenadas -> Texto (Ex: {lat: 41.15, lng: -8.62} -> "Avenida dos Aliados, Porto...")
+export const fetchReverseGeocode = (lat, lng) =>
+  api.get(`/reverse-geocode/`, { params: { lat, lng } });
