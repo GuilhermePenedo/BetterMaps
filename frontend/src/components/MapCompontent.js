@@ -1,4 +1,4 @@
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents, Polyline, useMap } from 'react-leaflet';
+import {MapContainer, TileLayer, Marker, Popup, useMapEvents, Polyline, useMap, ZoomControl} from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useState, useEffect } from 'react';
@@ -37,7 +37,7 @@ function MapComponent() {
     });
 
     const originIcon = new L.Icon({
-        iconUrl: process.env.PUBLIC_URL + '/marker.png',
+        iconUrl: process.env.PUBLIC_URL + '/origin_marker.png',
         iconSize: [36, 36],
         iconAnchor: [18, 36],
         popupAnchor: [0, -36],
@@ -45,7 +45,7 @@ function MapComponent() {
     });
 
     const destinationIcon = new L.Icon({
-        iconUrl: process.env.PUBLIC_URL + '/marker.png',
+        iconUrl: process.env.PUBLIC_URL + '/destination_marker.png',
         iconSize: [36, 36],
         iconAnchor: [18, 36],
         popupAnchor: [0, -36],
@@ -179,9 +179,11 @@ function MapComponent() {
         <div className="map-container-wrapper">
             <MapContainer 
                 center={mapCenter} 
-                zoom={13} 
+                zoom={13}
+                zoomControl={false}
                 style={{ height: '100vh', width: '100%', cursor: isSelectingOrigin ? 'crosshair' : 'default' }}
             >
+                <ZoomControl position="bottomright" />
                 <TileLayer
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -232,7 +234,25 @@ function MapComponent() {
                 )}
                 
                 {/* Linha da rota */}
-                {route && <Polyline positions={route} color="blue" weight={4} opacity={0.7} />}
+                {route && (
+                      <>
+                        {/* 1. A "Borda" (Linha de fundo, mais grossa e preta) */}
+                        <Polyline
+                          positions={route}
+                          color="black"
+                          weight={5} // 4 (peso da frente) + 2px de borda
+                          opacity={1}
+                        />
+
+                        {/* 2. A Linha Principal (Frente, colorida) */}
+                        <Polyline
+                          positions={route}
+                          color="#8c03fc"
+                          weight={4}
+                          opacity={0.7}
+                        />
+                      </>
+                    )}
             </MapContainer>
 
             {/* Painel Lateral */}
