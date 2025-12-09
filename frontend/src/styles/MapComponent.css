@@ -1,305 +1,245 @@
 /* =========================================
-   1. Layout Principal
+   1. Design System
    ========================================= */
+:root {
+    --primary: #8c03fc;
+    --primary-dark: #7000d6;
+    --text-main: #1f2937;
+    --text-light: #6b7280;
+    --bg-white: #ffffff;
+    --bg-hover: #f9fafb;
+    --border: #e5e7eb;
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
 .map-container-wrapper {
     position: relative;
     width: 100%;
     height: 100vh;
     display: flex;
     overflow: hidden;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-family: 'Inter', system-ui, sans-serif;
+    color: var(--text-main);
 }
 
 /* =========================================
-   2. Painel Lateral (Floating Card)
+   2. Painel Lateral
    ========================================= */
 .side-panel {
     position: absolute;
-    top: 24px;
-    left: 24px;
-    width: 380px;
-    background: #ffffff;
-    border-radius: 12px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0,0,0,0.04);
+    top: 20px;
+    left: 20px;
+    width: 360px;
+    background: var(--bg-white);
+    border-radius: 16px;
+    box-shadow: var(--shadow-lg);
     z-index: 1000;
     padding: 24px;
     display: flex;
     flex-direction: column;
-    gap: 20px;
-    max-height: calc(100vh - 48px);
+    gap: 16px;
+    max-height: calc(100vh - 40px);
     overflow-y: auto;
-    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 .side-panel h2 {
-    margin: 0;
-    font-size: 20px;
+    margin: 0 0 8px 0;
+    font-size: 18px;
     font-weight: 700;
-    color: #1a1a1a;
-    padding-bottom: 12px;
-    border-bottom: 1px solid #f0f0f0;
 }
 
 /* =========================================
-   3. Inputs e Formulários
+   3. Inputs & Botões
    ========================================= */
-.input-group {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    position: relative;
-}
-
 .input-group label {
     font-size: 11px;
-    font-weight: 700;
-    color: #6b7280;
+    font-weight: 600;
+    color: var(--text-light);
     text-transform: uppercase;
-    letter-spacing: 0.8px;
-    margin-left: 2px;
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+    display: block;
 }
 
 .input-wrapper {
     display: flex;
     align-items: center;
-    gap: 10px;
-    background: #f9fafb;
-    border: 1px solid #e5e7eb;
+    gap: 8px;
+    background: var(--bg-hover);
+    border: 1px solid var(--border);
     border-radius: 8px;
-    padding: 6px;
-    transition: border-color 0.2s, box-shadow 0.2s;
+    padding: 8px 12px;
+    transition: 0.2s;
 }
 
 .input-wrapper:focus-within {
-    border-color: #8c03fc;
+    border-color: var(--primary);
+    background: var(--bg-white);
     box-shadow: 0 0 0 3px rgba(140, 3, 252, 0.1);
-    background: #fff;
 }
 
 .location-input {
     flex: 1;
     border: none;
     background: transparent;
-    padding: 8px;
     font-size: 14px;
-    color: #1f2937;
+    color: var(--text-main);
+    outline: none;
     width: 100%;
 }
 
-.location-input:focus { outline: none; }
-.location-input::placeholder { color: #9ca3af; }
-
-/* =========================================
-   4. Botões de Ícone (GPS e Mapa)
-   ========================================= */
 .icon-btn {
-    width: 36px;
-    height: 36px;
-    background: white;
-    border: 1px solid #e5e7eb;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid transparent;
+    background: transparent;
     border-radius: 6px;
     cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 16px;
-    color: #4b5563;
-    transition: all 0.2s ease;
+    color: var(--text-light);
+    transition: 0.2s;
 }
 
-.icon-btn:hover {
-    background-color: #f3f4f6;
-    border-color: #d1d5db;
-    color: #111;
-    transform: translateY(-1px);
-}
-
-.icon-btn.active {
-    background-color: #f3e8ff;
-    border-color: #8c03fc;
-    color: #8c03fc;
-}
-
-.coordinates-text {
-    font-size: 12px;
-    color: #8c03fc;
-    font-weight: 500;
-    margin-top: -4px;
-    padding-left: 4px;
-    animation: slideDown 0.3s ease-out;
-}
-
-/* =========================================
-   5. Botões de Ação (Primary)
-   ========================================= */
-.actions-container {
-    display: flex;
-    gap: 12px;
-    margin-top: 8px;
-}
+.icon-btn:hover { background: #f3f4f6; color: var(--text-main); }
+.icon-btn.active { background: #f5f3ff; color: var(--primary); }
+.icon-btn svg { width: 18px; height: 18px; }
 
 .btn-primary {
-    flex: 1;
-    padding: 14px;
+    width: 100%;
+    padding: 12px;
     border: none;
     border-radius: 8px;
-    font-size: 14px;
+    background: var(--primary);
+    color: white;
     font-weight: 600;
     cursor: pointer;
-    background: linear-gradient(135deg, #8c03fc 0%, #7000d6 100%);
-    color: white;
-    box-shadow: 0 4px 6px rgba(140, 3, 252, 0.2);
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    transition: 0.2s;
 }
-
-.btn-primary:hover:not(:disabled) {
-    box-shadow: 0 6px 12px rgba(140, 3, 252, 0.3);
-    transform: translateY(-1px);
-    filter: brightness(1.1);
-}
-
-.btn-primary:disabled {
-    background: #e5e7eb;
-    color: #9ca3af;
-    cursor: not-allowed;
-    box-shadow: none;
-}
+.btn-primary:hover:not(:disabled) { background: var(--primary-dark); }
+.btn-primary:disabled { background: #e5e7eb; color: #9ca3af; cursor: not-allowed; }
 
 .btn-secondary {
-    background: #f3f4f6;
-    color: #4b5563;
-    padding: 14px 20px;
+    padding: 12px 16px;
+    background: transparent;
+    border: 1px solid var(--border);
     border-radius: 8px;
-    border: none;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s;
+    color: var(--text-main);
 }
+.btn-secondary:hover { background: var(--bg-hover); }
 
-.btn-secondary:hover {
-    background: #e5e7eb;
-    color: #1f2937;
-}
+.actions-container { display: flex; gap: 10px; margin-top: 8px; }
 
 /* =========================================
-   6. Seletor de Tipo de Rota (NOVO)
+   4. Seletores (Tipo & Transporte)
    ========================================= */
-.route-type-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr; /* 2 colunas */
-    gap: 12px;
-    margin-bottom: 5px;
+.transport-grid { display: flex; gap: 8px; }
+.transport-btn {
+    flex: 1; padding: 8px; border: 1px solid var(--border); background: var(--bg-white);
+    border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    gap: 6px; color: var(--text-light); font-size: 13px; font-weight: 500; transition: 0.2s;
 }
+.transport-btn.active { border-color: var(--primary); color: var(--primary); background: #f5f3ff; }
 
+.route-type-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .type-btn {
-    border: 1px solid #e5e7eb;
-    background: #fff;
-    padding: 12px;
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 600;
-    color: #6b7280; /* Cinza desativado */
-    cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    position: relative;
-    overflow: hidden;
+    padding: 10px; border: 1px solid var(--border); background: var(--bg-white);
+    border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600;
+    color: var(--text-light); display: flex; align-items: center; justify-content: center; gap: 8px; transition: 0.2s;
 }
-
-.type-btn:hover {
-    background-color: #f9fafb;
-    border-color: #d1d5db;
-    transform: translateY(-1px);
-}
-
-/* Estilo Ativo: Turística (Laranja) */
-.type-btn.tourist.active {
-    background-color: #fff7ed;
-    border-color: #f97316;
-    color: #c2410c;
-    box-shadow: 0 2px 4px rgba(249, 115, 22, 0.15);
-}
-
-/* Estilo Ativo: Climática (Azul/Verde) */
-.type-btn.climatic.active {
-    background-color: #eff6ff; /* Azul muito claro */
-    border-color: #3b82f6;
-    color: #1d4ed8;
-    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.15);
-}
-
-/* Indicador visual de seleção (opcional, borda mais grossa) */
-.type-btn.active {
-    border-width: 2px;
-    padding: 11px; /* Compensa a borda para não mudar tamanho */
-}
+.type-btn:hover { background: var(--bg-hover); }
+.type-btn.tourist.active { background: #fff7ed; border-color: #f97316; color: #ea580c; }
+.type-btn.climatic.active { background: #eff6ff; border-color: #3b82f6; color: #2563eb; }
 
 /* =========================================
-   7. Estatísticas
+   5. Estatísticas e Botões de Lista
    ========================================= */
 .route-stats {
-    background-color: #f8f9fa;
-    border: 1px solid #e9ecef;
-    border-radius: 8px;
-    padding: 15px;
-    margin-top: 15px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    animation: slideDown 0.3s ease-out;
+    display: flex; background: var(--bg-hover); border-radius: 8px; padding: 12px; margin-top: 10px;
+}
+.stat-item { flex: 1; text-align: center; }
+.stat-item:first-child { border-right: 1px solid #e5e7eb; }
+.stat-value { display: block; font-size: 16px; font-weight: 700; color: var(--text-main); }
+.stat-label { font-size: 10px; text-transform: uppercase; color: var(--text-light); margin-top: 2px; }
+
+/* Botões de Lista (Ícone com Badge) */
+.lists-triggers {
+    display: flex; gap: 12px; margin-top: 16px; padding-top: 16px;
+    border-top: 1px solid var(--border); justify-content: center;
 }
 
-.stat-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    flex: 1;
+.list-btn {
+    width: 44px; height: 44px; border: 1px solid var(--border); background: var(--bg-white);
+    border-radius: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    color: var(--text-light); transition: 0.2s; position: relative;
 }
+.list-btn:hover { background: var(--bg-hover); transform: translateY(-2px); color: var(--primary); border-color: var(--primary); }
+.list-btn svg { width: 22px; height: 22px; stroke-width: 2px; }
 
-.stat-item:first-child {
-    border-right: 1px solid #dee2e6;
+/* Badge de Contagem */
+.list-btn::after {
+    content: attr(data-count);
+    position: absolute; top: -6px; right: -6px;
+    background: var(--primary); color: white;
+    font-size: 10px; font-weight: 700;
+    min-width: 18px; height: 18px; border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    border: 2px solid white; opacity: 0; transform: scale(0); transition: 0.2s;
 }
+.list-btn[data-count]:not([data-count="0"])::after { opacity: 1; transform: scale(1); }
 
-.stat-label {
-    font-size: 11px;
-    color: #6c757d;
-    text-transform: uppercase;
-    font-weight: 600;
-    margin-bottom: 4px;
+/* =========================================
+   6. Modais (Popups)
+   ========================================= */
+.modal-overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px);
+    z-index: 2000; display: flex; align-items: center; justify-content: center;
+    animation: fadeIn 0.2s ease-out;
 }
+.modal-content {
+    background: white; width: 90%; max-width: 420px; max-height: 80vh;
+    border-radius: 16px; box-shadow: var(--shadow-lg);
+    display: flex; flex-direction: column; overflow: hidden; animation: scaleUp 0.2s;
+}
+.modal-header {
+    padding: 16px 20px; border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center; background: #fff;
+}
+.modal-header h3 { margin: 0; font-size: 16px; font-weight: 700; }
+.close-btn { background: none; border: none; font-size: 24px; color: var(--text-light); cursor: pointer; }
+.modal-body { padding: 0; overflow-y: auto; }
 
-.stat-value {
-    font-size: 18px;
-    font-weight: 700;
-    color: #212529;
+.group-header {
+    background: #f9fafb; padding: 10px 20px; font-size: 11px; font-weight: 700;
+    color: var(--text-light); text-transform: uppercase; border-bottom: 1px solid var(--border);
 }
+.list-item {
+    padding: 12px 20px; border-bottom: 1px solid #f3f4f6; display: flex; align-items: center; gap: 12px;
+}
+.item-icon-circle {
+    width: 32px; height: 32px; border-radius: 50%; background: #f3f4f6;
+    display: flex; align-items: center; justify-content: center; font-size: 14px;
+}
+.item-name { font-size: 14px; font-weight: 600; color: var(--text-main); }
+.item-meta { font-size: 12px; color: var(--text-light); }
+.color-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; border: 2px solid white; box-shadow: 0 0 0 1px #e5e7eb; }
+.weather-range { font-size: 13px; font-weight: 700; color: var(--text-main); margin-right: 6px; }
 
-@keyframes slideDown {
-    from { opacity: 0; transform: translateY(-5px); }
-    to { opacity: 1; transform: translateY(0); }
-}
+/* Custom Popup Leaflet */
+.leaflet-popup-content-wrapper { border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border: none; padding: 0; }
+.leaflet-popup-content { margin: 0; width: 200px !important; }
+.leaflet-popup-close-button { display: none; }
+.custom-popup { padding: 12px; text-align: center; }
+.popup-tag { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 700; text-transform: uppercase; margin-bottom: 6px; }
+.tag-tourist { background: #fff7ed; color: #c2410c; border: 1px solid #ffedd5; }
+.tag-sun { background: #fffbeb; color: #b45309; border: 1px solid #fef3c7; }
+.tag-rain { background: #eff6ff; color: #1d4ed8; border: 1px solid #dbeafe; }
+.popup-title { font-size: 14px; font-weight: 700; color: #1f2937; margin-bottom: 2px; }
+.popup-desc { font-size: 12px; color: #6b7280; }
 
-/* Responsividade Mobile */
-@media (max-width: 768px) {
-    .side-panel {
-        top: auto;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        border-radius: 20px 20px 0 0;
-        padding: 24px 20px;
-        max-height: 60vh;
-        box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
-    }
-    .leaflet-container {
-        height: 100vh !important;
-        position: absolute !important;
-        z-index: 0;
-    }
-}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes scaleUp { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
