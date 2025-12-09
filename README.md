@@ -64,3 +64,101 @@ Todo o planeamento e gestão do projeto encontra-se no **[Trello](https://trello
 | João Antunes | Developer Backend | Integração com APIs e lógica de rotas em Python (Django) |
 | Guilherme Penedo | Developer Backend | Integração com APIs e lógica de rotas em Python (Django) |
 | Guilherme Penedo | QA / Documentação | Testes, relatórios e documentação técnica |
+
+## Testes de Atributos de Qualidade
+
+Este projeto implementa testes abrangentes para validar os atributos de qualidade definidos, garantindo que o sistema atende aos requisitos de interoperabilidade, usabilidade, modificabilidade e performance.
+
+### A. Interoperabilidade (Interoperability)
+
+**Justificação**: O sistema é fundamentalmente um integrador. Ele precisa de comunicar eficazmente com múltiplos sistemas externos (OSRM, Open-Meteo, Nominatim).
+
+**Requisito**: O Backend deve ser capaz de normalizar as respostas JSON destas APIs diferentes num formato único e padrão para o Frontend consumir.
+
+**Resultados dos Testes**:
+- ✅ **PASSOU** - Todos os 4 testes passaram
+  - `test_osrm_response_normalization`: Valida normalização da resposta OSRM com `weather_segments` e `tourist_spots`
+  - `test_weather_api_response_normalization`: Valida normalização da resposta Open-Meteo para formato padrão
+  - `test_nominatim_response_normalization`: Valida formato consistente da resposta Nominatim
+  - `test_unified_response_structure`: Valida estrutura unificada que o frontend pode consumir
+
+**Conclusão**: O backend normaliza com sucesso as respostas de todas as APIs externas (OSRM, Open-Meteo, Nominatim) num formato único e consistente, facilitando o consumo pelo frontend.
+
+---
+
+### B. Usabilidade (Usability)
+
+**Justificação**: O README define como objetivo "fornecer uma interface de mapa interativa e intuitiva".
+
+**Requisito**: A interface deve permitir "Zoom, Pan e Seleção" sem latência percetível na renderização gráfica. O sistema deve fornecer feedback visual imediato ao traçar rotas.
+
+**Resultados dos Testes**:
+- ✅ **PASSOU** - Todos os 5 testes passaram (2 backend + 3 frontend)
+  
+  **Backend:**
+  - `test_route_response_time_acceptable`: Tempo de resposta de rotas < 2s ✅
+  - `test_geocode_response_time_acceptable`: Tempo de resposta de geocoding < 1s ✅
+  
+  **Frontend:**
+  - `B.1 - Interface permite zoom sem latência percetível`: Latência < 16ms (60fps) ✅
+  - `B.2 - Seleção de pontos fornece feedback visual imediato`: Tempo de resposta < 100ms ✅
+  - `B.3 - Renderização de rotas não bloqueia interface`: Interface não bloqueia por mais de 2s ✅
+
+**Conclusão**: A interface permite interações (zoom, pan, seleção) sem latência percetível e fornece feedback visual imediato, garantindo uma experiência de utilizador fluida.
+
+---
+
+### C. Modificabilidade (Modularity/Maintainability)
+
+**Justificação**: O projeto divide-se em serviços claros (RouteService, WeatherService, TourismService).
+
+**Requisito**: A arquitetura deve permitir adicionar um novo serviço (ex: um futuro "EmergencyService") sem ter de reescrever o código do RouteService. O uso do Django promove este desacoplamento.
+
+**Resultados dos Testes**:
+- ✅ **PASSOU** - Todos os 6 testes passaram
+  - `test_osrm_service_independent`: OSRM Service pode ser usado independentemente ✅
+  - `test_weather_service_independent`: Weather Service pode ser usado independentemente ✅
+  - `test_geocoding_service_independent`: Geocoding Service pode ser usado independentemente ✅
+  - `test_tourism_service_independent`: Tourism Service pode ser usado independentemente ✅
+  - `test_new_service_can_be_added`: Novo serviço pode ser adicionado sem modificar serviços existentes ✅
+  - `test_services_use_standard_interfaces`: Serviços seguem interfaces padrão que facilitam extensão ✅
+
+**Conclusão**: A arquitetura é modular e permite adicionar novos serviços sem modificar código existente. Todos os serviços são independentes e seguem interfaces padrão, facilitando a manutenção e extensão do sistema.
+
+---
+
+### D. Performance (Time Behaviour)
+
+**Justificação**: O cálculo de rotas e a exibição de dados meteorológicos precisam de ser rápidos para não bloquear a navegação no mapa.
+
+**Requisito**: O tempo de resposta entre o pedido de rota e a visualização deve ser otimizado, delegando o processamento pesado para as APIs externas (OSRM é citada como "rápida").
+
+**Resultados dos Testes**:
+- ✅ **PASSOU** - Todos os 5 testes passaram (3 backend + 2 frontend)
+  
+  **Backend:**
+  - `test_route_calculation_performance`: Cálculo de rotas < 0.5s (com mocks) ✅
+  - `test_weather_batch_performance`: Batch weather (50 pontos) < 1s ✅
+  - `test_route_with_climatic_performance`: Rotas climáticas < 1s ✅
+  
+  **Frontend:**
+  - `D.1 - Tempo entre pedido de rota e visualização é otimizado`: API responde < 100ms (com mocks) ✅
+  - `D.2 - Processamento de segmentos climáticos é eficiente`: Processamento de 50 segmentos < 200ms ✅
+
+**Conclusão**: O sistema demonstra excelente performance, com tempos de resposta otimizados tanto no backend quanto no frontend. O processamento pesado é delegado para APIs externas, mantendo a interface responsiva.
+
+---
+
+### Resumo Executivo
+
+| Atributo | Testes | Status | Taxa de Sucesso |
+|----------|--------|--------|-----------------|
+| **A. Interoperabilidade** | 4 | ✅ PASSOU | 100% (4/4) |
+| **B. Usabilidade** | 5 | ✅ PASSOU | 100% (5/5) |
+| **C. Modificabilidade** | 6 | ✅ PASSOU | 100% (6/6) |
+| **D. Performance** | 5 | ✅ PASSOU | 100% (5/5) |
+| **TOTAL** | **20** | ✅ **PASSOU** | **100% (20/20)** |
+
+**Executar os Testes**:
+- **Backend**: `cd backend && python manage.py test routes.tests.test_quality_attributes -v 2`
+- **Frontend**: `cd frontend && npm test -- qualityAttributes.test.js --watchAll=false`
