@@ -13,8 +13,14 @@ O objetivo deste projeto é desenvolver uma aplicação interativa que permita a
   - **Rotas Turísticas** (pontos de interesse e locais culturais ao longo do trajeto);
   - **Rotas Climáticas** (condições meteorológicas locais ao longo da rota com segmentos coloridos).
 
+## BPMN
+<img src=".images/bpmn.png" width=800 height=auto>
+
 ## Use Case Diagram
-<img src="https://i.imgur.com/XD0fC3C.png" width=800 height=auto>
+<img src=".images/usecase.png" width=800 height=auto>
+
+## Arquitetura de Sistema
+<img src=".images/system_arch.png" width=800 height=auto>
 
 ## Decisões Tecnológicas
 
@@ -48,7 +54,7 @@ O sistema é composto por **módulos principais** que interagem entre si:
 - **APIs Externas** → Fornecimento de dados em tempo real.
 
 ### Diagrama de Classes (Resumo)
-<img src="https://i.imgur.com/B8pj58j.png" width=1000 height=auto>
+<img src=".images/class_diagram.png" width=800 height=auto>
 
 ---
 
@@ -71,6 +77,96 @@ Este projeto foi desenhado tendo em conta quatro pilares fundamentais de qualida
 ### D. Performance (Time Behaviour)
 * **Justificação:** O cálculo de rotas e a exibição de dados meteorológicos não podem bloquear a navegação no mapa.
 * **Requisito:** O tempo de resposta entre o pedido de rota e a visualização deve ser otimizado, delegando o processamento pesado para as APIs externas.
+
+---
+
+## Implementação
+
+### Funcionalidades Implementadas
+
+#### 1. **Interface Interativa do Mapa** 
+A aplicação frontend apresenta uma interface baseada em Leaflet.js com as seguintes capacidades:
+- Visualização de mapa interativo com OpenStreetMap
+- Controlo de zoom e pan sem latência percetível
+- Seleção dinâmica de origem e destino no mapa
+- Marcadores de localização do utilizador
+- Painel lateral com informações de rota e opções de menu
+
+<img src=".images/ui_1.png" width=400 height=auto>
+
+#### 2. **Cálculo de Rotas Normais**
+Implementado através do serviço OSRM:
+- Cálculo de rota entre dois pontos (origem e destino)
+- Suporte para múltiplos perfis de transporte: automóvel, bicicleta e a pé
+- Retorno de informações detalhadas:
+  - Distância total (em metros)
+  - Tempo estimado (em segundos)
+
+<img src=".images/ui_2.png" width=400 height=auto>
+
+#### 3. **Rotas Turísticas**
+Integração com pontos de interesse (POIs) locais:
+- Deteção automática de pontos de interesse ao longo da rota
+- Geração de desvios para locais culturais, históricos e turísticos
+- Categorização de pontos (museus, monumentos, restaurantes, etc.)
+- Armazenamento local de POIs em base de dados SQLite
+- Dados importados de ficheiros CSV (portugal.csv, lisboa.csv)
+
+<img src=".images/ui_3_1.png" width=400 height=auto>
+<img src=".images/ui_3_2.png" width=400 height=auto>
+
+#### 4. **Rotas Climáticas**
+Análise de condições meteorológicas ao longo da rota:
+- Integração com API Open-Meteo para dados meteorológicos em tempo real
+- Processamento em lote (batch) de até 50 pontos por pedido para otimização
+- Análise de condições climáticas em segmentos da rota
+- Codificação visual por cores
+- Exibição do tempo para cada segmento
+
+<img src=".images/ui_4_1.png" width=400 height=auto>
+<img src=".images/ui_4_2.png" width=400 height=auto>
+
+#### 5. **Backend Django e Serviços**
+Arquitetura modular com os seguintes componentes:
+
+**Services Implementados:**
+- **OSRM Service** (`osrm_service.py`): Gestão de rotas com suporte turístico e climático
+- **Weather Service** (`weather_service.py`): Integração com Open-Meteo, processamento em batch
+- **Tourism Service** (`tourism_service.py`): Busca local de POIs com otimização geoespacial
+- **Geocoding Service** (`geocoding_service.py`): Conversão de coordenadas ↔ endereços via Nominatim
+- **Config** (`config.py`): Configuração centralizada de URLs e servidores
+
+**API Endpoints:**
+- `POST /api/route/` - Cálculo de rota (normal, turística ou climática)
+- `GET /api/geocode/` - Geocodificação de endereços
+- `POST /api/weather/` - Dados meteorológicos batch
+
+#### 6. **Gestão de Dados**
+- Base de dados SQLite para armazenamento persistente
+- Modelo `SimpleTouristPoint` para POIs com campos: lat, lng, name, category
+- Comando de management customizado (`load_points.py`) para importação de CSV
+- Migrations Django para versionamento de schema
+
+#### 7. **Testes Automatizados**
+- Testes de qualidade em backend (Django test framework)
+- Testes de qualidade em frontend (Jest)
+- Validação de atributos de qualidade (Interoperabilidade, Usabilidade, Modificabilidade, Performance)
+- Taxa de sucesso: 100% (20 testes executados com sucesso)
+
+### Componentes Frontend
+
+**Principais componentes React:**
+- `MapComponent.js` - Componente pai que coordena a interface
+- `MapMarkers.js` - Gestão de marcadores no mapa
+- `LocationMarker.js` - Marcador de localização do utilizador
+- `RouteModal.js` - Modal para seleção de tipo de rota
+- `SidePanel.js` - Painel lateral com informações
+- `ZoomTracker.js` - Tracking de nível de zoom
+
+**Hooks customizados:**
+- `useMapIcons.js` - Gestão de ícones do mapa
+- `useRouteData.js` - Lógica de obtenção de dados de rota
+- `useUserLocation.js` - Localização do utilizador em tempo real
 
 ---
 
@@ -138,4 +234,4 @@ Todo o planeamento e gestão do projeto encontra-se no **[Trello](https://trello
 | Guilherme Penedo | Developer Frontend | Interface, Leaflet.js, React.js, UX/UI |
 | João Antunes | Developer Backend | Integração com APIs e lógica de rotas (Django) |
 | Guilherme Penedo | Developer Backend | Integração com APIs e lógica de rotas (Django) |
-| Guilherme Penedo | QA / Documentação | Testes, relatórios e documentação técnica |
+| Guilherme Penedo | QA / Documentação | Testes, relatórios e documentação técnica |___
