@@ -1,0 +1,48 @@
+# Node modules (bibliotecas do React)
+node_modules/
+
+# Pastas de build geradas
+build/
+dist/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Diretório de dependências do Yarn
+.pnp/
+
+# Diretório do cache do Jest (testes)
+.jest/
+
+# Arquivos temporários do editor
+*.log
+*.lock
+
+# Configurações de ambiente (exemplo: variáveis de ambiente)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+
+# Diretórios de bundlers e caches de pacotes
+.cache/
+.parcel-cache/
+
+# Arquivos e pastas de configuração do editor
+.vscode/
+.idea
+
+# Ambiente virtual do Python
+.venv/
+activate_venv.sh
+
+# Ficheiros cache do Python
+__pycache__/
+*.pyc
