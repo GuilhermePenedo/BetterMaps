@@ -167,47 +167,85 @@ Arquitetura modular com os seguintes componentes:
 - `useRouteData.js` - Lógica de obtenção de dados de rota
 - `useUserLocation.js` - Localização do utilizador em tempo real
 
+## Escalabilidade
+
+### 1. Escalabilidade da Camada de Dados
+* **Migração para PostgreSQL/PostGIS**: O sistema utiliza atualmente SQLite para o armazenamento de pontos de interesse (POIs) e histórico. Para suportar grandes volumes de dados geográficos e consultas espaciais complexas, a transição para PostgreSQL com PostGIS garantirá maior performance e integridade de dados.
+* **Implementação de Caching**: Para reduzir a latência e a dependência excessiva de APIs externas (OSRM e Open-Meteo), pode ser integrada uma camada de cache como o **Redis** para armazenar rotas e previsões meteorológicas consultadas frequentemente.
+
+### 2. Escalabilidade do Backend
+* **Desacoplamento em Microserviços**: A separação lógica atual entre `OSRM Service`, `Weather Service` e `Tourism Service` permite que cada componente seja isolado num microserviço independente. Isto possibilita escalar individualmente o serviço com maior carga (ex: cálculo de rotas climáticas) sem afetar os restantes.
+
+### 3. Escalabilidade de Infraestrutura e APIs
+* **Self-hosting de Serviços Críticos**: Para eliminar limites de taxa (rate limits) e latência de rede, o sistema está preparado para migrar de APIs públicas para instâncias próprias de serviços como o **OSRM** ou o **Nominatim**, alojadas em hardware dedicado.
+* **Escalabilidade Horizontal**: O backend em Django, atuando como controlador entre o cliente e os serviços, pode ser replicado em múltiplas instâncias atrás de um **Load Balancer**, permitindo gerir um elevado número de pedidos simultâneos.
+
 ---
 
-## Relatório de Testes e QA
+## Relatório de Testes e Garantia de Qualidade (QA)
 
-Esta secção apresenta os resultados dos testes automatizados que validam os atributos de qualidade definidos acima.
+### Testes de Validação Comparativa
 
-### Resumo Executivo
+Para validar a precisão do motor de rotas **OSRM** utilizado no BetterMaps, foram realizados testes comparativos para garantir que as métricas de distância e tempo (ETA) são realistas quando comparadas com outras plataformas.
+
+#### Tabela de Resultados Práticos
+
+| Trajeto | Aplicação | Distância (km) | Tempo | Desvio (D: Distância \| T: Tempo) |
+| :--- | :--- | :--- | :--- | :--- |
+| **Urbano** | **BetterMaps** | 8.7km | 11min | - |
+| (Alameda -> Museu Coches) | Google Maps | 10.6km | 26min | D: +21.8% \| T: +136.4% |
+| | Waze | 10.9km | 28min | D: +25.3% \| T: +154.5% |
+| | Bing Maps | 10.8km | 25min | D: +24.1% \| T: +127.3% |
+| **Inter-urbano** | **BetterMaps** | 56.0km | 44min | - |
+| (Porto -> Braga) | Google Maps | 57.2km | 48min | D: +2.1% \| T: +9.1% |
+| | Waze | 57.2km | 47min | D: +2.1% \| T: +6.8% |
+| | Bing Maps | 57.5km | 45min | D: +2.7% \| T: +2.3% |
+| **Nacional** | **BetterMaps** | 279.0km | 3h 8min | - |
+| (Lisboa -> Faro) | Google Maps | 279.0km | 2h 54min | D: 0.0% \| T: -7.4% |
+| | Waze | 278.8km | 2h 47min | D: -0.1% \| T: -11.2% |
+| | Bing Maps | 282.5km | 2h 43min | D: +1.3% \| T: -13.3% |
+
+#### Justificação dos Resultados
+
+A análise dos dados revela que o BetterMaps apresenta uma elevada precisão geográfica, mas variações significativas no tempo estimado (ETA) face à concorrência. Estas diferenças justificam-se pelos seguintes fatores:
+
+1.  **Ausência de Dados de Tráfego em Tempo Real**: Esta é a principal causa dos desvios, especialmente visível no trajeto **Urbano**. O BetterMaps utiliza o motor OSRM com perfis de velocidade estáticos baseados nos limites das vias. Enquanto Google Maps e Waze ajustam o tempo com base no tráfego live, o BetterMaps calcula o tempo teórico ideal, o que explica o tempo de 11min vs os ~26min da concorrência em ambiente citadino.
+2.  **Precisão da Base de Dados (OSM)**: No trajeto **Nacional**, o desvio de distância foi praticamente nulo (0.0% vs Google Maps). Isto valida a excelente qualidade dos dados do OpenStreetMap e a eficiência do algoritmo de traçado de rotas do BetterMaps para longas distâncias.
+3.  **Diferença de Perfil de Velocidade**: No teste nacional, o BetterMaps revelou-se ligeiramente mais lento no cálculo temporal que as apps comerciais (ex: +7.4% que o Google Maps). Isto ocorre porque o perfil configurado no OSRM para autoestradas é mais conservador, enquanto os algoritmos comerciais refletem velocidades reais de circulação mais elevadas detetadas nos seus utilizadores.
+
+
+### Testes Automatizados (Atributos de Qualidade)
+
+Estes testes validam os pilares fundamentais da arquitetura do BetterMaps. No total, foram executados **20 testes automatizados** com uma taxa de sucesso de **100%**.
 
 | Atributo | Testes Executados | Status | Taxa de Sucesso |
-|----------|-------------------|--------|-----------------|
+| :--- | :---: | :---: | :---: |
 | **A. Interoperabilidade** | 4 | PASSOU | 100% |
 | **B. Usabilidade** | 5 | PASSOU | 100% |
 | **C. Modificabilidade** | 6 | PASSOU | 100% |
 | **D. Performance** | 5 | PASSOU | 100% |
 | **TOTAL** | **20** | **PASSOU** | **100%** |
 
-### Detalhe dos Resultados
+#### Detalhe dos Resultados
 
-#### A. Interoperabilidade
-* **Status:** PASSOU - Todos os 4 testes passaram.
-* **Validação:** O backend normaliza com sucesso as respostas de todas as APIs externas (OSRM, Open-Meteo, Nominatim) num formato único e consistente.
-* **Testes Chave:** `test_unified_response_structure`, `test_osrm_response_normalization`.
+* **Interoperabilidade:** O backend normaliza com sucesso as respostas JSON de todas as APIs externas (OSRM, Open-Meteo, Nominatim) num formato único e padrão.
+    * **Testes Chave:** `test_unified_response_structure`, `test_osrm_response_normalization`.
+* **Usabilidade:** A interface garante interações de zoom e pan sem latência percetível e fornece feedback visual imediato em menos de 100ms.
+    * **Testes Chave:** `test_route_response_time_acceptable`, validação de interface fluida.
+* **Modificabilidade:** A arquitetura provou ser modular, permitindo a adição de novos serviços sem impactar o código existente.
+    * **Testes Chave:** `test_new_service_can_be_added`, `test_services_use_standard_interfaces`.
+* **Performance:** O sistema mantém tempos de resposta otimizados (Cálculo de rota < 0.5s), delegando eficazmente o processamento pesado para APIs externas.
+    * **Testes Chave:** `test_route_calculation_performance`, `test_weather_batch_performance`.
 
-#### B. Usabilidade
-* **Status:** PASSOU - Todos os 5 testes passaram (Backend e Frontend).
-* **Validação:** A interface permite interações (zoom, pan, seleção) com latência < 16ms e fornece feedback visual imediato (< 100ms).
-* **Testes Chave:** `test_route_response_time_acceptable`, `Interface permite zoom sem latência`.
+#### Executar os testes
 
-#### C. Modificabilidade
-* **Status:** PASSOU - Todos os 6 testes passaram.
-* **Validação:** A arquitetura provou ser modular; novos serviços podem ser adicionados sem impacto no código existente.
-* **Testes Chave:** `test_new_service_can_be_added`, `test_services_use_standard_interfaces`.
+Para reproduzir os testes de qualidade localmente e validar os resultados documentados:
 
-#### D. Performance
-* **Status:** PASSOU - Todos os 5 testes passaram.
-* **Validação:** O sistema mantém tempos de resposta otimizados (Cálculo de rota < 0.5s, Batch weather < 1s), delegando processamento pesado eficazmente.
-* **Testes Chave:** `test_route_calculation_performance`, `test_weather_batch_performance`.
-
-### Como Executar os Testes
-
-Para reproduzir os testes de atributos de qualidade localmente:
+**Backend (Django):**
+```bash
+cd backend
+python manage.py test routes.tests.test_quality_attributes -v 2
+```
 
 **Backend (Django):**
 ```bash
